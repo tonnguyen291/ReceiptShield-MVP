@@ -107,7 +107,7 @@ export default function ManagerTeamPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Team Management</h1>
         <p className="text-gray-600 mt-2">Manage your team members and their expense submissions</p>
@@ -166,60 +166,60 @@ export default function ManagerTeamPage() {
           <CardTitle>Team Members</CardTitle>
           <CardDescription>Manage your team members and their expense submissions</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="p-4 sm:p-6">
+          <div className="space-y-5">
             {teamMembers.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-10 w-10">
+              <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-5 sm:p-6 border rounded-lg hover:bg-gray-50 transition-colors gap-5 sm:gap-4">
+                <div className="flex items-start space-x-4 flex-1 min-w-0">
+                  <Avatar className="h-12 w-12 flex-shrink-0">
                     <AvatarImage src={member.avatar} alt={member.name} />
                     <AvatarFallback>
                       {member.name.split(' ').map(n => n[0]).join('')}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-medium text-gray-900">{member.name}</h3>
-                      <Badge variant={getStatusColor(member.status)}>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-gray-900 text-base sm:text-lg">{member.name}</h3>
+                      <Badge variant={getStatusColor(member.status)} className="text-xs">
                         {getStatusIcon(member.status)}
                         <span className="ml-1 capitalize">{member.status}</span>
                       </Badge>
                     </div>
-                    <p className="text-sm text-gray-600">{member.role}</p>
-                    <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
-                      <span className="flex items-center">
-                        <Mail className="h-3 w-3 mr-1" />
-                        {member.email}
+                    <p className="text-sm sm:text-base text-gray-600 font-medium">{member.role}</p>
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
+                      <span className="flex items-center truncate">
+                        <Mail className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                        <span className="truncate">{member.email}</span>
                       </span>
                       <span className="flex items-center">
-                        <Receipt className="h-3 w-3 mr-1" />
+                        <Receipt className="h-3.5 w-3.5 mr-1.5" />
                         {member.receipts} receipts
                       </span>
-                      <span>Last: {member.lastSubmission}</span>
+                      <span className="whitespace-nowrap">Last: {member.lastSubmission}</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <div className="font-bold text-lg">${member.totalSpending.toLocaleString()}</div>
-                    <div className="text-sm text-gray-500">Total spent</div>
-                  </div>
-                  <div className="flex flex-col space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-4 flex-shrink-0 pt-2 sm:pt-0">
+                  <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+                    <div className="text-left sm:text-right">
+                      <div className="font-bold text-lg sm:text-xl mb-1">${member.totalSpending.toLocaleString()}</div>
+                      <div className="text-xs sm:text-sm text-gray-500">Total spent</div>
+                    </div>
                     {member.pendingApprovals > 0 && (
-                      <Badge variant="secondary" className="w-fit">
+                      <Badge variant="secondary" className="w-fit text-xs self-start sm:self-center">
                         {member.pendingApprovals} pending
                       </Badge>
                     )}
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Phone className="h-4 w-4 mr-1" />
-                        Call
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Mail className="h-4 w-4 mr-1" />
-                        Email
-                      </Button>
-                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs sm:text-sm py-2">
+                      <Phone className="h-4 w-4 mr-2" />
+                      <span>Call</span>
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs sm:text-sm py-2">
+                      <Mail className="h-4 w-4 mr-2" />
+                      <span>Email</span>
+                    </Button>
                   </div>
                 </div>
               </div>

@@ -44,8 +44,8 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Top Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100" style={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}>
-        <div className="px-4 sm:px-6 lg:px-8">
+      <nav className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100" style={{ paddingTop: 'max(env(safe-area-inset-top), 0px))' }}>
+        <div className="px-6 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex items-center space-x-2">
@@ -109,7 +109,7 @@ export default function HomePage() {
       </nav>
 
         {/* Hero Section */}
-        <section className="pb-16 px-4 sm:px-6 lg:px-8" style={{ paddingTop: 'calc(6rem + max(env(safe-area-inset-top), 0px)))' }}>
+        <section className="pb-16 px-6 sm:px-6 lg:px-8 pt-24 sm:pt-28" style={{ paddingTop: 'calc(7rem + max(env(safe-area-inset-top), 1rem))' }}>
         <div className="max-w-7xl mx-auto">
           <div className="text-center">
             <Badge className="mb-6 bg-green-50 text-green-700 border-green-200">
@@ -117,12 +117,12 @@ export default function HomePage() {
               AI-Powered Expense Management
             </Badge>
             
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight px-2 sm:px-0 break-words">
               AI-Powered Receipt Management &{" "}
               <span className="text-green-600">Fraud Detection</span>
             </h1>
             
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed px-2 sm:px-0">
               Automate your expense reporting, detect fraudulent submissions, and save hours every week 
               with intelligent OCR and real-time fraud alerts.
             </p>
@@ -141,8 +141,8 @@ export default function HomePage() {
             </div>
 
             {/* Dashboard Preview */}
-            <div className="relative max-w-4xl mx-auto">
-              <div className="bg-gray-50 rounded-2xl p-8 shadow-2xl">
+            <div className="relative max-w-4xl mx-auto px-2 sm:px-0">
+              <div className="bg-gray-50 rounded-2xl p-4 sm:p-8 shadow-2xl">
                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                   <div className="bg-gray-100 px-4 py-3 flex items-center space-x-2">
                     <div className="w-3 h-3 bg-red-400 rounded-full"></div>
