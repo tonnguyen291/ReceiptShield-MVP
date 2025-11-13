@@ -108,10 +108,12 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
 
     } catch (error) {
       console.error('Chatbot error:', error);
+      // runAssistant already handles errors and returns user-friendly messages
+      // This catch is for unexpected errors outside of runAssistant
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'I\'m sorry, but I encountered an error. Please try again later.',
+        content: "I'm sorry, but I encountered an unexpected error. Please try again later.",
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {

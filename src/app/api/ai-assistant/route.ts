@@ -63,9 +63,22 @@ Keep your response to 2-3 sentences unless the user asks for more detail.`;
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('❌ Gemini API error:', errorData);
+      console.error('❌ Gemini API error:', response.status, errorData);
+      
+      // Handle rate limiting (429)
+      if (response.status === 429) {
+        return NextResponse.json({
+          response: "I'm currently experiencing high demand. Please wait a moment and try again in a few seconds. Rate limits help ensure fair access for all users.",
+          error: 'RATE_LIMIT_EXCEEDED',
+          suggestUpload: false
+        }, { status: 429 });
+      }
+      
+      // Handle other API errors
       return NextResponse.json({
-        response: "I'm sorry, I encountered an error processing your request. Please try again later.",
+        response: response.status === 401 || response.status === 403
+          ? "I'm sorry, there's an authentication issue with the AI service. Please contact support."
+          : "I'm sorry, I encountered an error processing your request. Please try again later.",
         error: `Gemini API error: ${response.status}`,
         suggestUpload: false
       }, { status: response.status });
