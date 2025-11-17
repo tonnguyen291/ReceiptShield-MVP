@@ -47,14 +47,6 @@ export function SidebarLayout({ children, className, userRole = "employee", user
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Notifications */}
-            <button className="relative p-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-secondary)] rounded-lg">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4 19h6v-6H4v6z" />
-              </svg>
-              <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-            </button>
-
             {/* User Menu */}
             <div className="flex items-center space-x-3">
               <div className="text-right">

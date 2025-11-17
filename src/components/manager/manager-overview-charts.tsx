@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ShieldCheck, DollarSign, Files, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { getReceiptsForManager } from '@/lib/receipt-store';
+import { getReceiptTotalAmount } from '@/lib/data-service';
 import { subMonths, format, startOfMonth, endOfMonth } from 'date-fns';
+import type { ProcessedReceipt } from '@/types';
 
 interface MonthlyTotal {
   name: string;
@@ -29,10 +31,9 @@ export function ManagerOverviewCharts() {
       if (user?.id) {
         const allReceipts = await getReceiptsForManager(user.id);
 
+        // Use getReceiptTotalAmount to get only the "Total Amount" field, not sum all items
         const totalExpenses = allReceipts.reduce((acc, r) => {
-          const amountItem = r.items.find(i => i.label.toLowerCase().includes('total amount'));
-          const amountValue = parseFloat(amountItem?.value.replace(/[^0-9.-]+/g, "") || "0");
-          return acc + (isNaN(amountValue) ? 0 : amountValue);
+          return acc + getReceiptTotalAmount(r);
         }, 0);
 
         const fraudAlerts = allReceipts.filter(r => r.isFraudulent).length;
@@ -59,10 +60,9 @@ export function ManagerOverviewCharts() {
           return receiptDate >= start && receiptDate <= end;
         });
 
+        // Use getReceiptTotalAmount to get only the "Total Amount" field, not sum all items
         const monthTotal = monthReceipts.reduce((acc, r) => {
-            const amountItem = r.items.find(i => i.label.toLowerCase().includes('total amount'));
-            const amountValue = parseFloat(amountItem?.value.replace(/[^0-9.-]+/g, "") || "0");
-            return acc + (isNaN(amountValue) ? 0 : amountValue);
+          return acc + getReceiptTotalAmount(r);
         }, 0);
 
         sixMonthsData.push({ name: monthName, total: monthTotal });
@@ -135,6 +135,7 @@ export function ManagerOverviewCharts() {
                 contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }}
                 labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
                 itemStyle={{ color: 'hsl(var(--primary))' }}
+                formatter={(value: any) => `$${Number(value).toFixed(2)}`}
               />
               <Legend wrapperStyle={{fontSize: "12px", paddingTop: '10px'}} />
               <Bar dataKey="total" fill="hsl(var(--primary))" activeBar={{ fill: 'hsl(var(--primary), 0.8)' }} radius={[4, 4, 0, 0]} name="Total Expenses" />

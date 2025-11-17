@@ -123,7 +123,7 @@ export function CategoryBreakdownChart({ data, className }: CategoryBreakdownCha
                 <YAxis 
                   tick={{ fontSize: 12 }}
                   tickLine={{ stroke: '#6b7280' }}
-                  tickFormatter={(value) => `$${value}`}
+                  tickFormatter={(value) => `$${Number(value).toFixed(2)}`}
                 />
                 <Tooltip
                   content={({ active, payload }) => {
