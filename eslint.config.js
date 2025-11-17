@@ -1,6 +1,7 @@
 const js = require('@eslint/js');
 const typescriptEslint = require('@typescript-eslint/eslint-plugin');
 const typescriptParser = require('@typescript-eslint/parser');
+const reactHooks = require('eslint-plugin-react-hooks');
 
 module.exports = [
   js.configs.recommended,
@@ -55,6 +56,7 @@ module.exports = [
     },
     plugins: {
       '@typescript-eslint': typescriptEslint,
+      'react-hooks': reactHooks,
     },
     rules: {
       ...typescriptEslint.configs.recommended.rules,
@@ -65,6 +67,8 @@ module.exports = [
       'prefer-const': 'warn',
       'no-console': 'warn',
       'no-undef': 'off', // Turn off no-undef since we're using TypeScript
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
   {
@@ -84,6 +88,7 @@ module.exports = [
       'setup-firestore-connection.js',
       'check-firebase-status.js',
       'get-firebase-token.js',
+      'ios/',
     ],
   },
 ];
