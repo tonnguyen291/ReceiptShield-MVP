@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { Info, CheckCircle, XCircle, ShieldQuestion, FileType, Eye, Edit3 } from 'lucide-react';
 import { ReceiptActions } from './receipt-actions';
+import { summarizeAIAnalysis } from '@/lib/ai-analysis-summarizer';
 
 interface ReceiptDetailsDialogProps {
   receipt: ProcessedReceipt | null;
@@ -128,8 +129,14 @@ export function ReceiptDetailsDialog({ receipt, isOpen, onClose, onActionComplet
                   </div>
                    <div className="space-y-1 p-2 bg-muted/50 rounded-sm">
                      <span className="text-sm font-medium">AI Explanation:</span>
-                     <ScrollArea className="h-20">
-                        <p className="text-xs p-1.5 rounded-md min-h-[30px] whitespace-pre-wrap">{receipt.explanation || 'No AI explanation provided.'}</p>
+                     <ScrollArea className="h-24 mt-1">
+                        <p className="text-xs p-1.5 rounded-md leading-relaxed pr-2">
+                          {summarizeAIAnalysis(
+                            receipt.fraud_analysis?.ai_detection?.explanation || 
+                            receipt.explanation || 
+                            'No AI explanation provided.'
+                          )}
+                        </p>
                      </ScrollArea>
                    </div>
                    {receipt.managerNotes && (

@@ -14,6 +14,7 @@ import { ArrowLeft, AlertTriangle, Info, MessageSquareText, ShieldQuestion, Chec
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/auth-context';
+import { summarizeAIAnalysis } from '@/lib/ai-analysis-summarizer';
 
 
 export default function ReceiptDetailsPage() {
@@ -330,11 +331,13 @@ export default function ReceiptDetailsPage() {
                             {Math.round(receipt.fraud_analysis.ai_detection.fraudProbability * 100)}%
                           </span>
                         </div>
-                        <ScrollArea className="h-24 mt-2">
-                          <p className="text-xs text-purple-700 dark:text-purple-300 whitespace-pre-wrap">
-                            {receipt.fraud_analysis.ai_detection.explanation}
-                          </p>
-                        </ScrollArea>
+                        <div className="mt-2">
+                          <ScrollArea className="h-32 max-h-40">
+                            <p className="text-xs text-purple-700 dark:text-purple-300 leading-relaxed pr-2">
+                              {summarizeAIAnalysis(receipt.fraud_analysis.ai_detection.explanation)}
+                            </p>
+                          </ScrollArea>
+                        </div>
                       </div>
                     ) : (
                       <div className="p-3 bg-gray-50 dark:bg-gray-950/20 rounded-md border border-gray-200">
