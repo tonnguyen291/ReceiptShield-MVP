@@ -46,19 +46,20 @@ export function VendorAnalysisChart({ data }: VendorAnalysisChartProps) {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
-  const formatTooltip = (value: number, name: string) => {
-    if (name === 'amount') {
-      return [formatCurrency(value), 'Spend Amount'];
+  const formatTooltip = (value: number | string, name: string) => {
+    const numValue = typeof value === 'number' ? value : parseFloat(String(value)) || 0;
+    if (name === 'amount' || name === 'Spend Amount') {
+      return [formatCurrency(Number(numValue.toFixed(2))), 'Spend Amount'];
     }
-    if (name === 'cumulativePercentage') {
-      return [`${value.toFixed(1)}%`, 'Cumulative %'];
+    if (name === 'cumulativePercentage' || name === 'Cumulative %') {
+      return [`${numValue.toFixed(1)}%`, 'Cumulative %'];
     }
-    return [value, name];
+    return [typeof value === 'number' ? value.toFixed(2) : value, name];
   };
 
   const getRiskLevel = (percentage: number) => {

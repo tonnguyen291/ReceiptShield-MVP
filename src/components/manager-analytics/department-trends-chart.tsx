@@ -46,13 +46,14 @@ export function DepartmentTrendsChart({ data }: DepartmentTrendsChartProps) {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
-  const formatTooltip = (value: number, name: string) => {
-    return [formatCurrency(value), name];
+  const formatTooltip = (value: number | string, name: string) => {
+    const numValue = typeof value === 'number' ? value : parseFloat(String(value)) || 0;
+    return [formatCurrency(Number(numValue.toFixed(2))), name];
   };
 
   const formatMonth = (month: string) => {
