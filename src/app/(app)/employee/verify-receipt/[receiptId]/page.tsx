@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, AlertTriangle, CheckCircle, Loader2, FileEdit, FileType, Eye } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle, Loader2, FileEdit, FileType, Eye, Plus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 // import { performEnhancedFraudAnalysis } from '@/lib/enhanced-fraud-service'; // Temporarily disabled
 import { extractTextWithTesseract } from '@/lib/tesseract-ocr-service';
@@ -57,6 +57,66 @@ export default function VerifyReceiptPage() {
       prevItems.map(item => (item.id === id ? { ...item, value: newValue } : item))
     );
   };
+
+  const handleAddNewField = () => {
+    const newId = `new-field-${Date.now()}`;
+    const newItem: ReceiptDataItem = {
+      id: newId,
+      label: 'New Field',
+      value: ''
+    };
+    setEditableItems(prevItems => [...prevItems, newItem]);
+  };
+
+  const handleFieldLabelChange = (id: string, newLabel: string) => {
+    setEditableItems(prevItems =>
+      prevItems.map(item => (item.id === id ? { ...item, label: newLabel } : item))
+    );
+  };
+
+  const handleRemoveField = (id: string) => {
+    setEditableItems(prevItems => prevItems.filter(item => item.id !== id));
+  };
+
+  // Expected fields that should always be available
+  const expectedFields = [
+    { label: 'Vendor', placeholder: 'Enter vendor/store name' },
+    { label: 'Items', placeholder: 'Enter item names (separated by |)' },
+    { label: 'Prices', placeholder: 'Enter prices (separated by |)' },
+    { label: 'Subtotal', placeholder: 'Enter subtotal amount' },
+    { label: 'Tax', placeholder: 'Enter tax amount' },
+    { label: 'Total', placeholder: 'Enter total amount' },
+    { label: 'Date', placeholder: 'Enter receipt date' }
+  ];
+
+  // Ensure all expected fields are present
+  const ensureExpectedFields = () => {
+    setEditableItems(prevItems => {
+      const existingLabels = new Set(prevItems.map(item => item.label.toLowerCase()));
+      const missingFields = expectedFields.filter(
+        field => !existingLabels.has(field.label.toLowerCase())
+      );
+
+      if (missingFields.length > 0) {
+        const newItems = missingFields.map(field => ({
+          id: `expected-${field.label.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+          label: field.label,
+          value: '',
+        }));
+        return [...prevItems, ...newItems];
+      }
+      
+      return prevItems;
+    });
+  };
+
+  // Run ensureExpectedFields when receipt loads or OCR completes
+  useEffect(() => {
+    if (receipt && editableItems.length >= 0) {
+      ensureExpectedFields();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receipt?.id]);
 
   const convertImageToDataUri = async (imageUrl: string): Promise<string> => {
     try {
@@ -190,8 +250,30 @@ export default function VerifyReceiptPage() {
       clearInterval(progressInterval);
       setOcrProgress(100);
 
-      // Update the editable items with Tesseract results
-      setEditableItems(ocrResult.items);
+      // Merge OCR results with existing items, preserving blank expected fields
+      setEditableItems(prevItems => {
+        const existingLabels = new Set(prevItems.map(item => item.label.toLowerCase()));
+        const ocrItemsMap = new Map(ocrResult.items.map(item => [item.label.toLowerCase(), item]));
+        
+        // Update existing items with OCR results if they match
+        const updatedItems = prevItems.map(item => {
+          const ocrItem = ocrItemsMap.get(item.label.toLowerCase());
+          if (ocrItem && ocrItem.value.trim()) {
+            return ocrItem; // Use OCR value if it exists and is not empty
+          }
+          return item; // Keep existing value (including empty expected fields)
+        });
+        
+        // Add new OCR items that don't exist yet
+        const newOcrItems = ocrResult.items.filter(item => 
+          !existingLabels.has(item.label.toLowerCase()) && item.value.trim()
+        );
+        
+        return [...updatedItems, ...newOcrItems];
+      });
+      
+      // Ensure expected fields are still present after merge
+      ensureExpectedFields();
 
       toast({
         title: 'OCR Complete!',
@@ -496,28 +578,41 @@ export default function VerifyReceiptPage() {
                 )}
             </div>
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold text-lg mb-2 text-[var(--color-text)]">Extracted Items (Editable)</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTesseractOCR}
-                  disabled={isOcrProcessing || isProcessing}
-                  className="text-xs"
-                >
-                  {isOcrProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                      OCR: {ocrProgress}%
-                    </>
-                  ) : (
-                    <>
-                      <FileType className="mr-2 h-3 w-3" />
-                      Re-extract with Tesseract
-                    </>
-                  )}
-                </Button>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold text-lg text-[var(--color-text)]">Receipt Information (Editable)</h3>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddNewField}
+                    disabled={isProcessing}
+                    className="text-xs"
+                  >
+                    <Plus className="mr-1 h-3 w-3" />
+                    Add Field
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTesseractOCR}
+                    disabled={isOcrProcessing || isProcessing}
+                    className="text-xs"
+                  >
+                    {isOcrProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        OCR: {ocrProgress}%
+                      </>
+                    ) : (
+                      <>
+                        <FileType className="mr-2 h-3 w-3" />
+                        Re-extract with Tesseract
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
               <ScrollArea className="h-[300px] md:h-[400px] pr-3 border border-[var(--color-border)] rounded-md p-3 bg-[var(--color-bg-secondary)] shadow-inner">
                  {editableItems.length === 0 && (
@@ -532,21 +627,70 @@ export default function VerifyReceiptPage() {
                     </div>
                  )}
 
-                {editableItems.filter(item => item.label !== "Note").map((item, index) => (
-                  <div key={`${item.id}-${item.label}-${index}`} className="mb-3">
-                    <Label htmlFor={item.id} className="text-sm font-medium text-[var(--color-text)]">
-                      {item.label}
-                    </Label>
-                    <Input
-                      id={item.id}
-                      type="text"
-                      value={item.value}
-                      onChange={(e) => handleItemChange(item.id, e.target.value)}
-                      className="mt-1 text-sm bg-[var(--color-bg)]"
-                      disabled={isProcessing}
-                    />
-                  </div>
-                ))}
+                {editableItems.filter(item => item.label !== "Note").map((item, index) => {
+                  const isEmpty = !item.value || item.value.trim() === '';
+                  const isExpectedField = expectedFields.some(f => f.label.toLowerCase() === item.label.toLowerCase());
+                  const fieldConfig = expectedFields.find(f => f.label.toLowerCase() === item.label.toLowerCase());
+                  const isCustomField = item.id.startsWith('new-field-');
+                  
+                  return (
+                    <div 
+                      key={`${item.id}-${item.label}-${index}`} 
+                      className={`mb-3 p-2 rounded-md border ${
+                        isEmpty && isExpectedField 
+                          ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20' 
+                          : 'border-[var(--color-border)]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        {isCustomField ? (
+                          <Input
+                            id={`label-${item.id}`}
+                            type="text"
+                            value={item.label}
+                            onChange={(e) => handleFieldLabelChange(item.id, e.target.value)}
+                            className="flex-1 text-sm font-medium bg-[var(--color-bg)] h-8"
+                            disabled={isProcessing}
+                            placeholder="Field name"
+                          />
+                        ) : (
+                          <Label htmlFor={item.id} className="text-sm font-medium text-[var(--color-text)] flex-1">
+                            {item.label}
+                            {isEmpty && isExpectedField && (
+                              <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 font-normal">
+                                (Required - Please fill in)
+                              </span>
+                            )}
+                          </Label>
+                        )}
+                        {isCustomField && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveField(item.id)}
+                            disabled={isProcessing}
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            title="Remove field"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <Input
+                        id={item.id}
+                        type="text"
+                        value={item.value}
+                        onChange={(e) => handleItemChange(item.id, e.target.value)}
+                        className={`text-sm bg-[var(--color-bg)] ${
+                          isEmpty && isExpectedField ? 'border-amber-300 focus:border-amber-500' : ''
+                        }`}
+                        disabled={isProcessing}
+                        placeholder={fieldConfig?.placeholder || `Enter ${item.label.toLowerCase()}`}
+                      />
+                    </div>
+                  );
+                })}
               </ScrollArea>
                <p className="text-xs text-[var(--color-text-secondary)] mt-1 px-1">
                   Ensure key details like Vendor, Total Amount, and Date are accurate.

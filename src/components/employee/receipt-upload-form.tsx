@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { uploadReceiptImage, fileToDataUri, testStorageConnectivity } from '@/lib/firebase-storage';
 import { addReceipt } from '@/lib/firebase-receipt-store';
 import { performEnhancedOCRAnalysis } from '@/lib/enhanced-ocr-service';
-import { extractTextWithTesseract } from '@/lib/tesseract-ocr-service';
+import { extractTextWithTesseract, type OCRConfidenceBreakdown } from '@/lib/tesseract-ocr-service';
 import { canUploadReceipt, recordReceiptUpload } from '@/lib/subscription-middleware';
 // import { performEnhancedFraudAnalysis } from '@/lib/enhanced-fraud-service'; // Temporarily disabled
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,8 @@ export default function ReceiptUploadForm() {
   const [extractedItems, setExtractedItems] = useState<ReceiptDataItem[]>([]);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
+  const [ocrConfidenceBreakdown, setOcrConfidenceBreakdown] = useState<OCRConfidenceBreakdown | null>(null);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [usageInfo, setUsageInfo] = useState<{ current: number; limit: number; reason?: string } | null>(null);
   const [uploadSteps, setUploadSteps] = useState<UploadStep[]>([
@@ -79,6 +81,8 @@ export default function ReceiptUploadForm() {
     setError(null);
     setSelectedFile(file);
     setExtractedItems([]); // Clear previous extracted items
+    setOcrConfidence(null);
+    setOcrConfidenceBreakdown(null);
     
     try {
       const dataUri = await fileToDataUri(file);
@@ -94,6 +98,8 @@ export default function ReceiptUploadForm() {
   const performOCRProcessing = async (imageDataUri: string) => {
     setIsOcrProcessing(true);
     setOcrProgress(0);
+    setOcrConfidence(null);
+    setOcrConfidenceBreakdown(null);
     
     try {
       console.log('🔍 Starting automatic OCR processing...');
@@ -108,18 +114,23 @@ export default function ReceiptUploadForm() {
       clearInterval(progressInterval);
       setOcrProgress(100);
 
-      // Update extracted items
+      // Update extracted items and confidence
       setExtractedItems(ocrResult.items);
+      setOcrConfidence(ocrResult.confidence);
+      setOcrConfidenceBreakdown(ocrResult.confidenceBreakdown || null);
       
       console.log('✅ OCR completed:', {
         itemsCount: ocrResult.items.length,
         confidence: ocrResult.confidence,
-        processingTime: ocrResult.processingTime
+        processingTime: ocrResult.processingTime,
+        confidenceBreakdown: ocrResult.confidenceBreakdown
       });
 
     } catch (error) {
       console.error('❌ OCR processing failed:', error);
       setError('OCR processing failed. You can still proceed with manual entry.');
+      setOcrConfidence(null);
+      setOcrConfidenceBreakdown(null);
     } finally {
       setIsOcrProcessing(false);
       setOcrProgress(0);
@@ -513,6 +524,8 @@ export default function ReceiptUploadForm() {
     setExtractedItems([]);
     setIsOcrProcessing(false);
     setOcrProgress(0);
+    setOcrConfidence(null);
+    setOcrConfidenceBreakdown(null);
     setUploadSteps(prev => prev.map(step => ({ ...step, status: 'pending', progress: 0 })));
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -611,6 +624,78 @@ export default function ReceiptUploadForm() {
                 </div>
               ) : extractedItems.length > 0 ? (
                 <div className="space-y-3">
+                  {/* Confidence Score Display */}
+                  {ocrConfidence !== null && (
+                    <div className="mb-4">
+                      <div className={`rounded-lg border-2 p-4 ${
+                        ocrConfidence >= 0.8 
+                          ? 'bg-green-50 border-green-200' 
+                          : ocrConfidence >= 0.6 
+                          ? 'bg-amber-50 border-amber-200' 
+                          : 'bg-red-50 border-red-200'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`font-semibold text-sm ${
+                            ocrConfidence >= 0.8 
+                              ? 'text-green-800' 
+                              : ocrConfidence >= 0.6 
+                              ? 'text-amber-800' 
+                              : 'text-red-800'
+                          }`}>
+                            OCR Confidence Score
+                          </span>
+                          <span className={`text-lg font-bold ${
+                            ocrConfidence >= 0.8 
+                              ? 'text-green-700' 
+                              : ocrConfidence >= 0.6 
+                              ? 'text-amber-700' 
+                              : 'text-red-700'
+                          }`}>
+                            {Math.round(ocrConfidence * 100)}%
+                          </span>
+                        </div>
+                        <Progress 
+                          value={ocrConfidence * 100} 
+                          className={`h-2 ${
+                            ocrConfidence >= 0.8 
+                              ? 'bg-green-200' 
+                              : ocrConfidence >= 0.6 
+                              ? 'bg-amber-200' 
+                              : 'bg-red-200'
+                          }`}
+                        />
+                        <p className={`text-xs mt-2 ${
+                          ocrConfidence >= 0.8 
+                            ? 'text-green-700' 
+                            : ocrConfidence >= 0.6 
+                            ? 'text-amber-700' 
+                            : 'text-red-700'
+                        }`}>
+                          {ocrConfidence >= 0.8 
+                            ? '✅ High confidence - OCR extraction looks accurate' 
+                            : ocrConfidence >= 0.6 
+                            ? '⚠️ Moderate confidence - Please review extracted data' 
+                            : '❌ Low confidence - Manual verification recommended'}
+                        </p>
+                        {ocrConfidenceBreakdown && (
+                          <div className="mt-3 pt-3 border-t border-gray-300">
+                            <p className="text-xs font-medium mb-2 text-gray-700">Data Completeness: {Math.round(ocrConfidenceBreakdown.dataCompleteness * 100)}%</p>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {Object.entries(ocrConfidenceBreakdown.perField).map(([field, conf]) => (
+                                <div key={field} className="flex justify-between">
+                                  <span className="text-gray-600 capitalize">{field}:</span>
+                                  <span className={conf > 0.7 ? 'text-green-600' : conf > 0.4 ? 'text-amber-600' : 'text-red-600'}>
+                                    {Math.round(conf * 100)}%
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="grid gap-2">
                     {extractedItems.map((item, index) => (
                       <div key={`${item.id}-${index}`} className="flex justify-between items-center p-2 bg-gray-50 rounded border">
