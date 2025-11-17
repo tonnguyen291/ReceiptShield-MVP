@@ -9,13 +9,30 @@ export function summarizeAIAnalysis(explanation: string): string {
     return 'No analysis available.';
   }
 
-  // Remove common prefixes that add no value
+  // Remove prompt artifacts, formatting, and clean up text
   let cleaned = explanation
-    .replace(/^AI Analysis:\s*/i, '')
-    .replace(/^Analysis:\s*/i, '')
+    // Remove common AI response prefixes
+    .replace(/^(AI Analysis|Analysis|Summary|Conclusion|Assessment|Evaluation):\s*/gi, '')
+    .replace(/^(Based on|According to|The analysis|This receipt|The receipt|Receipt analysis|Fraud analysis):\s*/gi, '')
+    // Remove markdown formatting
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // Bold
+    .replace(/\*([^*]+)\*/g, '$1') // Italic
+    .replace(/\*\s*/g, '') // Standalone asterisks
+    .replace(/^[-*•]\s+/gm, '') // Bullet points
+    .replace(/^#+\s+/gm, '') // Headers
+    // Remove newlines and normalize whitespace
+    .replace(/\\n/g, ' ')
+    .replace(/\n/g, ' ')
+    .replace(/\r/g, ' ')
+    .replace(/\s+/g, ' ') // Multiple spaces to single space
+    // Remove common prompt phrases
+    .replace(/\b(Please note|Note that|It should be noted|It is important to note|Keep in mind|Remember that|As mentioned|As stated|As indicated)\b[.,]?\s*/gi, '')
+    .replace(/\b(This analysis|This assessment|The following|The above|The below)\b[.,]?\s*/gi, '')
+    // Remove quotes around the entire text
+    .replace(/^["']|["']$/g, '')
     .trim();
 
-  // If already short (under 400 chars), return as-is
+  // If already short (under 400 chars), return cleaned version
   if (cleaned.length <= 400) {
     return cleaned;
   }
@@ -115,7 +132,16 @@ export function summarizeAIAnalysis(explanation: string): string {
     }
   }
 
-  return summary.trim();
+  // Final cleanup: remove any remaining formatting artifacts
+  summary = summary
+    .replace(/\*\*/g, '') // Remove any remaining bold markers
+    .replace(/\*/g, '') // Remove any remaining asterisks
+    .replace(/\\n/g, ' ') // Remove escaped newlines
+    .replace(/\n/g, ' ') // Remove newlines
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+
+  return summary;
 }
 
 /**
@@ -131,9 +157,26 @@ export function getAIStatusSummary(explanation: string, fraudProbability: number
       : 'Analysis shows no significant issues.';
   }
 
+  // Apply same cleaning as summarizeAIAnalysis
   const cleaned = explanation
-    .replace(/^AI Analysis:\s*/i, '')
-    .replace(/^Analysis:\s*/i, '')
+    // Remove common AI response prefixes
+    .replace(/^(AI Analysis|Analysis|Summary|Conclusion|Assessment|Evaluation):\s*/gi, '')
+    .replace(/^(Based on|According to|The analysis|This receipt|The receipt|Receipt analysis|Fraud analysis):\s*/gi, '')
+    // Remove markdown formatting
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // Bold
+    .replace(/\*([^*]+)\*/g, '$1') // Italic
+    .replace(/\*\s*/g, '') // Standalone asterisks
+    .replace(/^[-*•]\s+/gm, '') // Bullet points
+    // Remove newlines and normalize whitespace
+    .replace(/\\n/g, ' ')
+    .replace(/\n/g, ' ')
+    .replace(/\r/g, ' ')
+    .replace(/\s+/g, ' ') // Multiple spaces to single space
+    // Remove common prompt phrases
+    .replace(/\b(Please note|Note that|It should be noted|It is important to note|Keep in mind|Remember that|As mentioned|As stated|As indicated)\b[.,]?\s*/gi, '')
+    .replace(/\b(This analysis|This assessment|The following|The above|The below)\b[.,]?\s*/gi, '')
+    // Remove quotes around the entire text
+    .replace(/^["']|["']$/g, '')
     .trim();
 
   // Extract first meaningful sentence
@@ -149,6 +192,15 @@ export function getAIStatusSummary(explanation: string, fraudProbability: number
   }
 
   let firstSentence = sentences[0];
+
+  // Final cleanup
+  firstSentence = firstSentence
+    .replace(/\*\*/g, '') // Remove any remaining bold markers
+    .replace(/\*/g, '') // Remove any remaining asterisks
+    .replace(/\\n/g, ' ') // Remove escaped newlines
+    .replace(/\n/g, ' ') // Remove newlines
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
 
   // Truncate if too long
   if (firstSentence.length > 120) {

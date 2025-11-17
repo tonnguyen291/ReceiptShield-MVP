@@ -85,8 +85,7 @@ export default function VerifyReceiptPage() {
     { label: 'Prices', placeholder: 'Enter prices (separated by |)' },
     { label: 'Subtotal', placeholder: 'Enter subtotal amount' },
     { label: 'Tax', placeholder: 'Enter tax amount' },
-    { label: 'Total', placeholder: 'Enter total amount' },
-    { label: 'Date', placeholder: 'Enter receipt date' }
+    { label: 'Total', placeholder: 'Enter total amount' }
   ];
 
   // Ensure all expected fields are present
@@ -693,7 +692,7 @@ export default function VerifyReceiptPage() {
                 })}
               </ScrollArea>
                <p className="text-xs text-[var(--color-text-secondary)] mt-1 px-1">
-                  Ensure key details like Vendor, Total Amount, and Date are accurate.
+                  Ensure key details like Vendor and Total Amount are accurate.
                   Correct any "Extraction Failed" or "Not found" values if visible on the receipt.
                 </p>
             </div>

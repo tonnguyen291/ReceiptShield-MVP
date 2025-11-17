@@ -370,7 +370,9 @@ export default function ReceiptDetailsPage() {
                     <div className="space-y-1 p-3 bg-muted/50 rounded-md shadow-sm">
                       <span className="text-sm font-medium">Analysis Explanation:</span>
                       <ScrollArea className="h-36">
-                          <p className="text-xs p-2 rounded-md min-h-[40px] whitespace-pre-wrap">{receipt.explanation || 'No explanation provided.'}</p>
+                          <p className="text-xs p-2 rounded-md min-h-[40px] leading-relaxed">
+                            {receipt.explanation ? summarizeAIAnalysis(receipt.explanation) : 'No explanation provided.'}
+                          </p>
                       </ScrollArea>
                     </div>
                   </div>
