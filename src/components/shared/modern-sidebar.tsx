@@ -9,9 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/auth-context";
 import { Chatbot } from "@/components/shared/chatbot";
-import { getAllReceipts, getReceiptsBySupervisor } from "@/lib/firebase-receipt-store";
+import { getAllReceipts } from "@/lib/firebase-receipt-store";
+import { getReceiptsForManager } from "@/lib/receipt-store";
+import { getEmployeesForManager, initializeDefaultUsers } from "@/lib/firebase-user-store";
 import { getUnreadNotificationCount } from "@/lib/firebase-notification-store";
 import { getCompany } from "@/lib/firebase-company-store";
+import { getReceiptTotalAmount } from "@/lib/data-service";
+import type { ProcessedReceipt } from "@/types";
 import {
   Home,
   ReceiptText,
@@ -117,6 +121,87 @@ export function ModernSidebar({
     fetchCompanyName();
   }, [user?.companyId]);
 
+  // Helper function to analyze receipt for fraud (simplified version for sidebar)
+  const analyzeReceiptForFraud = (receipt: ProcessedReceipt, allReceipts: ProcessedReceipt[]): boolean => {
+    // Check if receipt is already marked as fraudulent
+    if (receipt.isFraudulent) {
+      return true;
+    }
+
+    let fraudScore = 0;
+
+    // Duplicate Receipt Detection
+    const receiptAmount = getReceiptTotalAmount(receipt);
+    const receiptDate = new Date(receipt.uploadedAt);
+    const receiptVendor = extractVendor(receipt);
+
+    const recentReceipts = allReceipts.filter(r => 
+      r.uploadedBy === receipt.uploadedBy &&
+      r.id !== receipt.id &&
+      Math.abs(new Date(r.uploadedAt).getTime() - receiptDate.getTime()) < 7 * 24 * 60 * 60 * 1000
+    );
+
+    // Check for exact duplicates
+    const exactDuplicates = recentReceipts.filter(r => {
+      const rAmount = getReceiptTotalAmount(r);
+      const rVendor = extractVendor(r);
+      const rDate = new Date(r.uploadedAt);
+      return Math.abs(rAmount - receiptAmount) < 0.01 && 
+             rVendor.toLowerCase() === receiptVendor.toLowerCase() &&
+             Math.abs(rDate.getTime() - receiptDate.getTime()) < 24 * 60 * 60 * 1000;
+    });
+
+    if (exactDuplicates.length > 0) {
+      fraudScore += 0.8;
+    }
+
+    // Amount Analysis
+    const userReceipts = allReceipts.filter(r => r.uploadedBy === receipt.uploadedBy && r.id !== receipt.id);
+    if (userReceipts.length > 0) {
+      const amounts = userReceipts.map(getReceiptTotalAmount).filter(a => a > 0);
+      if (amounts.length > 0) {
+        const avgAmount = amounts.reduce((sum, a) => sum + a, 0) / amounts.length;
+        const maxAmount = Math.max(...amounts);
+        const stdDev = Math.sqrt(amounts.reduce((sum, a) => sum + Math.pow(a - avgAmount, 2), 0) / amounts.length);
+
+        if (receiptAmount > maxAmount * 2) {
+          fraudScore += 0.7;
+        } else if (receiptAmount > avgAmount + (3 * stdDev)) {
+          fraudScore += 0.5;
+        }
+      }
+    }
+
+    // Vendor Analysis
+    const userVendors = userReceipts.map(extractVendor).filter(v => v.length > 0);
+    const vendorCounts = userVendors.reduce((acc, v) => {
+      acc[v.toLowerCase()] = (acc[v.toLowerCase()] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    if (!vendorCounts[receiptVendor.toLowerCase()]) {
+      fraudScore += 0.4;
+    }
+
+    // Timing Analysis
+    const hour = receiptDate.getHours();
+    if (hour < 6 || hour > 22) {
+      fraudScore += 0.3;
+    }
+
+    return fraudScore > 0.3;
+  };
+
+  // Helper function to extract vendor from receipt
+  const extractVendor = (receipt: ProcessedReceipt): string => {
+    const vendorItem = receipt.items?.find(item => 
+      item.label.toLowerCase().includes('vendor') || 
+      item.label.toLowerCase().includes('merchant') ||
+      item.label.toLowerCase().includes('store')
+    );
+    return vendorItem?.value || 'Unknown';
+  };
+
   // Load fraud alerts and notifications counts
   useEffect(() => {
     const loadCounts = async () => {
@@ -130,9 +215,49 @@ export function ModernSidebar({
           const fraudCount = allReceipts.filter(r => r.isFraudulent).length;
           setFraudAlertsCount(fraudCount);
         } else if (userRole === 'manager') {
-          const managerReceipts = await getReceiptsBySupervisor(user.id, user.companyId);
-          const fraudCount = managerReceipts.filter(r => r.isFraudulent).length;
-          setFraudAlertsCount(fraudCount);
+          // Use same approach as fraud alerts page and team dashboard
+          await initializeDefaultUsers();
+          
+          // Get team members - use same approach as Team Dashboard
+          const teamMembers = await getEmployeesForManager(user.id);
+          
+          // Get all receipts for the manager's team (by supervisorId)
+          const receiptsBySupervisor = await getReceiptsForManager(user.id);
+          
+          // Also get receipts by employee emails/IDs to catch any that might not have supervisorId set
+          const { getReceiptsByUser } = await import('@/lib/firebase-receipt-store');
+          const employeeReceiptPromises = teamMembers.map(emp => {
+            if (emp.email) {
+              return getReceiptsByUser(emp.email, user?.companyId);
+            }
+            return Promise.resolve([]);
+          });
+          const employeeReceiptsArrays = await Promise.all(employeeReceiptPromises);
+          const receiptsByEmployee = employeeReceiptsArrays.flat();
+          
+          // Combine and deduplicate receipts
+          const receiptMap = new Map<string, ProcessedReceipt>();
+          [...receiptsBySupervisor, ...receiptsByEmployee].forEach(receipt => {
+            if (receipt.id) {
+              receiptMap.set(receipt.id, receipt);
+            }
+          });
+          const allReceipts = Array.from(receiptMap.values());
+          
+          // Perform real-time fraud analysis (same logic as fraud alerts page)
+          // Only count receipts that require action (pending or investigating), not approved/rejected
+          const fraudAlerts: ProcessedReceipt[] = [];
+          for (const receipt of allReceipts) {
+            if (analyzeReceiptForFraud(receipt, allReceipts)) {
+              // Only include if status is pending_approval or not yet resolved
+              const status = receipt.status || 'pending_approval';
+              if (status === 'pending_approval' || status === 'pending' || !['approved', 'rejected', 'resolved'].includes(status)) {
+                fraudAlerts.push(receipt);
+              }
+            }
+          }
+          
+          setFraudAlertsCount(fraudAlerts.length);
         } else {
           // Employees don't have fraud alerts badge
           setFraudAlertsCount(null);

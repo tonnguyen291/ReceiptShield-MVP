@@ -30,13 +30,17 @@ export function ReceiptDetailsDialog({ receipt, isOpen, onClose, onActionComplet
   if (!receipt) return null;
 
   const fraudProbabilityPercent = Math.round(receipt.fraudProbability * 100);
-  const isPdf = receipt.imageDataUri?.startsWith('data:application/pdf');
+  
+  // Determine image source and check if it's a PDF
+  const imageSource = receipt.imageUrl || receipt.imageDataUri;
+  const hasValidImageSource = imageSource && imageSource.trim() !== '';
+  const isPdf = hasValidImageSource && (imageSource.startsWith('data:application/pdf') || receipt.fileName?.toLowerCase().endsWith('.pdf'));
   
   const openPdfInNewTab = () => {
-    if (receipt && isPdf) {
+    if (receipt && isPdf && imageSource) {
       const pdfWindow = window.open("");
       if (pdfWindow) {
-        pdfWindow.document.write(`<iframe width='100%' height='100%' title='${receipt.fileName}' src='${receipt.imageDataUri}'></iframe>`);
+        pdfWindow.document.write(`<iframe width='100%' height='100%' title='${receipt.fileName}' src='${imageSource}'></iframe>`);
         pdfWindow.document.title = receipt.fileName;
       }
     }
@@ -79,16 +83,50 @@ export function ReceiptDetailsDialog({ receipt, isOpen, onClose, onActionComplet
                     <Eye className="mr-2 h-4 w-4" /> View Full PDF
                   </Button>
                 </div>
-              ) : (
+              ) : hasValidImageSource ? (
                 <div className="border rounded-md overflow-hidden shadow-md relative min-h-[300px] md:min-h-[400px]">
-                  <Image
-                    src={receipt.imageDataUri || ''}
-                    alt={`Receipt ${receipt.fileName}`}
-                    fill
-                    style={{objectFit: 'contain'}}
-                    className="p-1"
-                    data-ai-hint="receipt image"
-                  />
+                  {imageSource.startsWith('http') ? (
+                    // For Firebase Storage URLs, use regular img tag
+                    <img
+                      src={imageSource}
+                      alt={`Receipt ${receipt.fileName}`}
+                      className="absolute inset-0 w-full h-full object-contain p-2"
+                      style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
+                      onError={(e) => {
+                        console.error('Image load error:', {
+                          src: imageSource,
+                          error: e
+                        });
+                        // Try to use proxy if Firebase Storage URL fails
+                        if (imageSource.includes('firebasestorage.googleapis.com')) {
+                          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageSource)}`;
+                          e.currentTarget.src = proxyUrl;
+                        }
+                      }}
+                    />
+                  ) : (
+                    // For data URIs, use Next.js Image component
+                    <Image
+                      src={imageSource}
+                      alt={`Receipt ${receipt.fileName}`}
+                      fill
+                      style={{objectFit: 'contain'}}
+                      className="p-1"
+                      unoptimized={imageSource.startsWith('data:')}
+                      data-ai-hint="receipt image"
+                      onError={(e) => {
+                        console.error('Next.js Image load error:', {
+                          src: imageSource.substring(0, 100),
+                          error: e
+                        });
+                      }}
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className="border rounded-lg shadow-md bg-muted min-h-[300px] md:min-h-[400px] flex flex-col items-center justify-center p-4">
+                  <FileType className="w-16 h-16 text-muted-foreground mb-4" />
+                  <p className="text-sm text-center mb-4 text-muted-foreground">Receipt image not available</p>
                 </div>
               )}
             </div>

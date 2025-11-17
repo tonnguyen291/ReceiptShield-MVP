@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Clock, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { getEmployeesForManager } from "@/lib/firebase-user-store";
+import { getEmployeesForManager, initializeDefaultUsers } from "@/lib/firebase-user-store";
 import { getReceiptsForManager } from "@/lib/receipt-store";
 import { getReceiptTotalAmount } from "@/lib/data-service";
+import type { ProcessedReceipt } from "@/types";
 
 interface TeamSpendingData {
   employee: string;
@@ -43,7 +44,7 @@ export default function ManagerAnalyticsPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!user?.id || !user?.companyId) {
+      if (!user?.id || user?.role !== 'manager') {
         setIsLoading(false);
         return;
       }
@@ -51,13 +52,38 @@ export default function ManagerAnalyticsPage() {
       try {
         setIsLoading(true);
 
-        // Get team members
-        const teamMembers = await getEmployeesForManager(user.id, user.companyId);
+        // Initialize default users if needed (same as Team Dashboard)
+        await initializeDefaultUsers();
+
+        // Get team members - use same approach as Team Dashboard
+        const teamMembers = await getEmployeesForManager(user.id);
         console.log('Team Analytics - Team members:', teamMembers.length, teamMembers.map(m => ({ id: m.id, email: m.email, name: m.name })));
         
-        // Get all receipts for the manager's team
-        const allReceipts = await getReceiptsForManager(user.id);
-        console.log('Team Analytics - All receipts:', allReceipts.length);
+        // Get all receipts for the manager's team (by supervisorId)
+        const receiptsBySupervisor = await getReceiptsForManager(user.id);
+        console.log('Team Analytics - Receipts by supervisorId:', receiptsBySupervisor.length);
+        
+        // Also get receipts by employee emails/IDs to catch any that might not have supervisorId set
+        const { getReceiptsByUser } = await import('@/lib/firebase-receipt-store');
+        const employeeReceiptPromises = teamMembers.map(emp => {
+          if (emp.email) {
+            return getReceiptsByUser(emp.email, user?.companyId);
+          }
+          return Promise.resolve([]);
+        });
+        const employeeReceiptsArrays = await Promise.all(employeeReceiptPromises);
+        const receiptsByEmployee = employeeReceiptsArrays.flat();
+        console.log('Team Analytics - Receipts by employee emails:', receiptsByEmployee.length);
+        
+        // Combine and deduplicate receipts
+        const receiptMap = new Map<string, ProcessedReceipt>();
+        [...receiptsBySupervisor, ...receiptsByEmployee].forEach(receipt => {
+          if (receipt.id) {
+            receiptMap.set(receipt.id, receipt);
+          }
+        });
+        const allReceipts = Array.from(receiptMap.values());
+        console.log('Team Analytics - Total unique receipts:', allReceipts.length);
         
         if (allReceipts.length > 0) {
           console.log('Team Analytics - Sample receipts:', allReceipts.slice(0, 3).map(r => ({
@@ -217,7 +243,7 @@ export default function ManagerAnalyticsPage() {
     };
 
     loadData();
-  }, [user?.id, user?.companyId]);
+  }, [user?.id, user?.role]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -322,8 +348,8 @@ export default function ManagerAnalyticsPage() {
                 <p>No team spending data available</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {teamSpending.map((member, index) => (
+            <div className="space-y-4">
+              {teamSpending.map((member, index) => (
                 <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -347,7 +373,7 @@ export default function ManagerAnalyticsPage() {
                   </div>
                 </div>
               ))}
-              </div>
+            </div>
             )}
           </CardContent>
         </Card>
@@ -363,8 +389,8 @@ export default function ManagerAnalyticsPage() {
                 <p>No category data available</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {categoryBreakdown.map((category, index) => (
+            <div className="space-y-4">
+              {categoryBreakdown.map((category, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{category.category}</span>
@@ -382,7 +408,7 @@ export default function ManagerAnalyticsPage() {
                   <div className="text-sm text-gray-500">{category.count} transactions</div>
                 </div>
               ))}
-              </div>
+            </div>
             )}
           </CardContent>
         </Card>

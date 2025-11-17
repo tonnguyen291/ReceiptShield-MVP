@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Users, DollarSign, Receipt, Clock, CheckCircle, AlertTriangle, Mail, Phone, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { getEmployeesForManager } from "@/lib/firebase-user-store";
+import { getEmployeesForManager, initializeDefaultUsers } from "@/lib/firebase-user-store";
 import { getReceiptsForManager } from "@/lib/receipt-store";
 import { getReceiptTotalAmount } from "@/lib/data-service";
 import { format } from "date-fns";
@@ -42,14 +42,7 @@ export default function ManagerTeamPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!user?.id) {
-        console.log('Manager Team Page - No user ID:', user);
-        setIsLoading(false);
-        return;
-      }
-
-      if (!user?.companyId) {
-        console.log('Manager Team Page - No companyId:', user);
+      if (!user?.id || user?.role !== 'manager') {
         setIsLoading(false);
         return;
       }
@@ -57,14 +50,11 @@ export default function ManagerTeamPage() {
       try {
         setIsLoading(true);
 
-        console.log('Manager Team Page - Loading data for manager:', {
-          managerId: user.id,
-          companyId: user.companyId,
-          userEmail: user.email
-        });
+        // Initialize default users if needed (same as Team Dashboard)
+        await initializeDefaultUsers();
 
-        // Get team members
-        const employees = await getEmployeesForManager(user.id, user.companyId);
+        // Get team members - use same approach as Team Dashboard
+        const employees = await getEmployeesForManager(user.id);
         console.log('Manager Team Page - Employees fetched:', employees.length, employees);
         
         // Get all receipts for the manager's team (by supervisorId)
@@ -75,7 +65,7 @@ export default function ManagerTeamPage() {
         const { getReceiptsByUser } = await import('@/lib/firebase-receipt-store');
         const employeeReceiptPromises = employees.map(emp => {
           if (emp.email) {
-            return getReceiptsByUser(emp.email, user.companyId);
+            return getReceiptsByUser(emp.email, user?.companyId);
           }
           return Promise.resolve([]);
         });
