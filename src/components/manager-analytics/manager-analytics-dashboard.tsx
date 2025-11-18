@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, BarChart3, TrendingUp, AlertTriangle, Users, Building2, Store, Clock } from 'lucide-react';
@@ -11,18 +11,20 @@ import { DepartmentTrendsChart } from './department-trends-chart';
 import { FraudOutliersChart } from './fraud-outliers-chart';
 import { SubmissionTimingHeatmap } from './submission-timing-heatmap';
 import { getManagerAnalytics, type ManagerAnalytics } from '@/lib/data-service';
+import { useAuth } from '@/contexts/auth-context';
 
 interface ManagerAnalyticsDashboardProps {
   managerId: string;
 }
 
 export function ManagerAnalyticsDashboard({ managerId }: ManagerAnalyticsDashboardProps) {
+  const { user } = useAuth();
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed'>('overview');
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     if (!managerId) {
       setError('Manager ID is required');
       setIsLoading(false);
@@ -32,7 +34,8 @@ export function ManagerAnalyticsDashboard({ managerId }: ManagerAnalyticsDashboa
     try {
       setIsLoading(true);
       setError(null);
-      const data = await getManagerAnalytics(managerId);
+      // Pass companyId to filter by company
+      const data = await getManagerAnalytics(managerId, user?.companyId);
       setAnalytics(data);
     } catch (err) {
       console.error('Failed to load manager analytics:', err);
@@ -40,13 +43,13 @@ export function ManagerAnalyticsDashboard({ managerId }: ManagerAnalyticsDashboa
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [managerId, user?.companyId]);
 
   useEffect(() => {
     if (managerId) {
       loadAnalytics();
     }
-  }, [managerId]);
+  }, [managerId, loadAnalytics]);
 
   if (isLoading) {
     return (

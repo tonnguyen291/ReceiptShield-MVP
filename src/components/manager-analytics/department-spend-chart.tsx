@@ -43,19 +43,20 @@ export function DepartmentSpendChart({ data }: DepartmentSpendChartProps) {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
-  const formatTooltip = (value: number, name: string) => {
-    if (name === 'amount') {
-      return [formatCurrency(value), 'Total Spend'];
+  const formatTooltip = (value: number | string, name: string) => {
+    const numValue = typeof value === 'number' ? value : parseFloat(String(value)) || 0;
+    if (name === 'amount' || name === 'Total Spend') {
+      return [formatCurrency(Number(numValue.toFixed(2))), 'Total Spend'];
     }
-    if (name === 'count') {
-      return [value, 'Receipt Count'];
+    if (name === 'count' || name === 'Receipt Count') {
+      return [numValue, 'Receipt Count'];
     }
-    return [value, name];
+    return [typeof value === 'number' ? value.toFixed(2) : value, name];
   };
 
   return (

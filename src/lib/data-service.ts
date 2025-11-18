@@ -182,7 +182,7 @@ export interface SpendingAnalytics {
 }
 
 // Helper function to extract total amount from receipt items (same logic as receipts page)
-function getReceiptTotalAmount(receipt: ProcessedReceipt): number {
+export function getReceiptTotalAmount(receipt: ProcessedReceipt): number {
   const amountItem = receipt.items?.find(i => 
     i.label.toLowerCase().includes('total amount') || 
     i.label.toLowerCase().includes('amount') ||
@@ -389,20 +389,30 @@ export interface ManagerAnalytics {
   submissionTiming: { day: string; employee: string; count: number; amount: number }[];
 }
 
-export async function getManagerAnalytics(managerId: string): Promise<ManagerAnalytics> {
+export async function getManagerAnalytics(managerId: string, companyId?: string): Promise<ManagerAnalytics> {
   try {
     if (!managerId) {
       throw new Error('Manager ID is required');
     }
 
-    // Get all receipts for the manager's team
-    const allReceipts = await getAllReceipts();
+    // Get the manager's team members to filter receipts correctly
+    const { getEmployeesForManager } = await import('./firebase-user-store');
+    const teamMembers = await getEmployeesForManager(managerId, companyId);
+    const teamMemberEmails = new Set(teamMembers.map(m => m.email).filter(Boolean));
+    const teamMemberIds = new Set(teamMembers.map(m => m.id).filter(Boolean));
     
-    // Filter receipts for the manager's team (assuming we can identify team members)
-    const teamReceipts = allReceipts.filter(receipt => 
-      receipt.supervisorId === managerId || 
-      (receipt.uploadedBy && receipt.uploadedBy.includes('@')) // For now, include all receipts
-    );
+    // Get receipts for the manager's team using getReceiptsForManager (filters by supervisorId)
+    const { getReceiptsForManager } = await import('./receipt-store');
+    const allReceipts = await getReceiptsForManager(managerId);
+    
+    // Filter receipts to only those from the manager's team members (by email or ID)
+    // This ensures we only show employees that actually belong to this manager
+    const teamReceipts = allReceipts.filter(receipt => {
+      // Include receipts uploaded by team members
+      return teamMemberEmails.has(receipt.uploadedBy) || 
+             teamMemberIds.has(receipt.uploadedBy) ||
+             receipt.supervisorId === managerId;
+    });
 
     // Department Spend Analysis
     const departmentSpend = await getDepartmentSpendAnalysis(teamReceipts);
@@ -453,11 +463,8 @@ async function getDepartmentSpendAnalysis(receipts: ProcessedReceipt[]): Promise
 
     // Extract department from email domain or use supervisor info
     const department = extractDepartmentFromEmail(receipt.uploadedBy);
-    const amount = receipt.items.reduce((sum, item) => {
-      if (!item.value) return sum;
-      const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-      return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-    }, 0);
+    // Use getReceiptTotalAmount to get only the "Total Amount" field, not sum all items
+    const amount = getReceiptTotalAmount(receipt);
     
     if (!departmentMap[department]) {
       departmentMap[department] = { amount: 0, count: 0 };
@@ -483,11 +490,8 @@ async function getEmployeeLeaderboard(receipts: ProcessedReceipt[]): Promise<{ e
 
     const employee = receipt.uploadedBy;
     const department = extractDepartmentFromEmail(receipt.uploadedBy);
-    const amount = receipt.items.reduce((sum, item) => {
-      if (!item.value) return sum;
-      const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-      return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-    }, 0);
+    // Use getReceiptTotalAmount to get only the "Total Amount" field, not sum all items
+    const amount = getReceiptTotalAmount(receipt);
     
     if (!employeeMap[employee]) {
       employeeMap[employee] = { amount: 0, count: 0, department };
@@ -510,10 +514,8 @@ async function getVendorAnalysis(receipts: ProcessedReceipt[]): Promise<{ vendor
   receipts.forEach(receipt => {
     // Extract vendor from receipt items or use a default
     const vendor = receipt.items[0]?.label || 'Unknown Vendor';
-    const amount = receipt.items.reduce((sum, item) => {
-      const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-      return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-    }, 0);
+    // Use getReceiptTotalAmount to get only the "Total Amount" field, not sum all items
+    const amount = getReceiptTotalAmount(receipt);
     
     vendorMap[vendor] = (vendorMap[vendor] || 0) + amount;
   });
@@ -523,7 +525,7 @@ async function getVendorAnalysis(receipts: ProcessedReceipt[]): Promise<{ vendor
     .map(([vendor, amount]) => ({
       vendor,
       amount,
-      percentage: (amount / totalAmount) * 100
+      percentage: totalAmount > 0 ? (amount / totalAmount) * 100 : 0
     }))
     .sort((a, b) => b.amount - a.amount);
   
@@ -545,10 +547,8 @@ async function getDepartmentTrends(receipts: ProcessedReceipt[]): Promise<{ mont
     const date = new Date(receipt.uploadedAt);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const department = extractDepartmentFromEmail(receipt.uploadedBy);
-    const amount = receipt.items.reduce((sum, item) => {
-      const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-      return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-    }, 0);
+    // Use getReceiptTotalAmount to get only the "Total Amount" field, not sum all items
+    const amount = getReceiptTotalAmount(receipt);
     
     if (!monthlyData[monthKey]) {
       monthlyData[monthKey] = {};
@@ -576,10 +576,8 @@ async function getFraudOutliers(receipts: ProcessedReceipt[]): Promise<{ employe
   
   receipts.forEach(receipt => {
     const employee = receipt.uploadedBy;
-    const amount = receipt.items.reduce((sum, item) => {
-      const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-      return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-    }, 0);
+    // Use getReceiptTotalAmount to get only the "Total Amount" field, not sum all items
+    const amount = getReceiptTotalAmount(receipt);
     
     if (!employeeSpending[employee]) {
       employeeSpending[employee] = [];
@@ -589,6 +587,8 @@ async function getFraudOutliers(receipts: ProcessedReceipt[]): Promise<{ employe
   
   // Calculate statistics for outlier detection
   const allAmounts = Object.values(employeeSpending).flat();
+  if (allAmounts.length === 0) return [];
+  
   const mean = allAmounts.reduce((sum, amount) => sum + amount, 0) / allAmounts.length;
   const variance = allAmounts.reduce((sum, amount) => sum + Math.pow(amount - mean, 2), 0) / allAmounts.length;
   const stdDev = Math.sqrt(variance);
@@ -616,10 +616,8 @@ async function getSubmissionTiming(receipts: ProcessedReceipt[]): Promise<{ day:
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
     const employee = receipt.uploadedBy.split('@')[0];
     const key = `${dayOfWeek}-${employee}`;
-    const amount = receipt.items.reduce((sum, item) => {
-      const priceMatch = item.value.match(/\$?(\d+\.?\d*)/);
-      return sum + (priceMatch ? parseFloat(priceMatch[1]) : 0);
-    }, 0);
+    // Use getReceiptTotalAmount to get only the "Total Amount" field, not sum all items
+    const amount = getReceiptTotalAmount(receipt);
     
     if (!timingData[key]) {
       timingData[key] = { count: 0, amount: 0 };

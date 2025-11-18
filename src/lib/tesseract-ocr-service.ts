@@ -632,7 +632,7 @@ const TOTAL_KEYWORDS = [
 ];
 
 function normalizeAmount(amount: string): string {
-  const cleaned = amount.replace(/[^0-9.\-]/g, '');
+  const cleaned = amount.replace(/[^0-9.-]/g, '');
   if (!cleaned) {
     return amount.trim();
   }

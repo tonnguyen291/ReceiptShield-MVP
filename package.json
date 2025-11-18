@@ -115,6 +115,7 @@
     "@types/react-dom": "^18.3.7",
     "@typescript-eslint/eslint-plugin": "^8.46.0",
     "@typescript-eslint/parser": "^8.46.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "firebase-tools": "^14.18.0",
     "genkit-cli": "^1.8.0",
     "postcss": "^8",

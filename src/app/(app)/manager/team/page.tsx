@@ -5,80 +5,157 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, DollarSign, Receipt, Clock, CheckCircle, AlertTriangle, Mail, Phone } from "lucide-react";
+import { Users, DollarSign, Receipt, Clock, CheckCircle, AlertTriangle, Mail, Phone, Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { getEmployeesForManager, initializeDefaultUsers } from "@/lib/firebase-user-store";
+import { getReceiptsForManager } from "@/lib/receipt-store";
+import { getReceiptTotalAmount } from "@/lib/data-service";
+import { format } from "date-fns";
+import type { ProcessedReceipt } from "@/types";
+
+interface TeamMemberData {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string;
+  totalSpending: number;
+  receipts: number;
+  status: string;
+  lastSubmission: string;
+  pendingApprovals: number;
+}
 
 export default function ManagerTeamPage() {
-  const [teamMembers, setTeamMembers] = useState([
-    {
-      id: 1,
-      name: "Sarah Johnson",
-      email: "sarah.johnson@company.com",
-      role: "Senior Developer",
-      avatar: "/avatars/sarah.jpg",
-      totalSpending: 2450,
-      receipts: 15,
-      status: "active",
-      lastSubmission: "2024-01-15",
-      pendingApprovals: 3
-    },
-    {
-      id: 2,
-      name: "Mike Chen",
-      email: "mike.chen@company.com",
-      role: "Product Manager",
-      avatar: "/avatars/mike.jpg",
-      totalSpending: 1890,
-      receipts: 12,
-      status: "active",
-      lastSubmission: "2024-01-14",
-      pendingApprovals: 2
-    },
-    {
-      id: 3,
-      name: "Emily Davis",
-      email: "emily.davis@company.com",
-      role: "UX Designer",
-      avatar: "/avatars/emily.jpg",
-      totalSpending: 1650,
-      receipts: 10,
-      status: "active",
-      lastSubmission: "2024-01-13",
-      pendingApprovals: 1
-    },
-    {
-      id: 4,
-      name: "John Smith",
-      email: "john.smith@company.com",
-      role: "Marketing Specialist",
-      avatar: "/avatars/john.jpg",
-      totalSpending: 1420,
-      receipts: 8,
-      status: "active",
-      lastSubmission: "2024-01-12",
-      pendingApprovals: 0
-    },
-    {
-      id: 5,
-      name: "Lisa Wang",
-      email: "lisa.wang@company.com",
-      role: "Data Analyst",
-      avatar: "/avatars/lisa.jpg",
-      totalSpending: 1380,
-      receipts: 9,
-      status: "active",
-      lastSubmission: "2024-01-11",
-      pendingApprovals: 2
-    }
-  ]);
-
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberData[]>([]);
   const [teamStats, setTeamStats] = useState({
-    totalMembers: 12,
-    activeMembers: 10,
-    totalSpending: 12500,
-    averagePerMember: 1041.67,
-    pendingApprovals: 8,
-    fraudAlerts: 2
+    totalMembers: 0,
+    activeMembers: 0,
+    totalSpending: 0,
+    averagePerMember: 0,
+    pendingApprovals: 0,
+    fraudAlerts: 0,
+    totalReceipts: 0
   });
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user?.id || user?.role !== 'manager') {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+
+        // Initialize default users if needed (same as Team Dashboard)
+        await initializeDefaultUsers();
+
+        // Get team members - use same approach as Team Dashboard
+        const employees = await getEmployeesForManager(user.id);
+        console.log('Manager Team Page - Employees fetched:', employees.length, employees);
+        
+        // Get all receipts for the manager's team (by supervisorId)
+        const receiptsBySupervisor = await getReceiptsForManager(user.id);
+        console.log('Manager Team Page - Receipts by supervisorId:', receiptsBySupervisor.length);
+        
+        // Also get receipts by employee emails/IDs to catch any that might not have supervisorId set
+        const { getReceiptsByUser } = await import('@/lib/firebase-receipt-store');
+        const employeeReceiptPromises = employees.map(emp => {
+          if (emp.email) {
+            return getReceiptsByUser(emp.email, user?.companyId);
+          }
+          return Promise.resolve([]);
+        });
+        const employeeReceiptsArrays = await Promise.all(employeeReceiptPromises);
+        const receiptsByEmployee = employeeReceiptsArrays.flat();
+        console.log('Manager Team Page - Receipts by employee emails:', receiptsByEmployee.length);
+        
+        // Combine and deduplicate receipts
+        const receiptMap = new Map<string, ProcessedReceipt>();
+        [...receiptsBySupervisor, ...receiptsByEmployee].forEach(receipt => {
+          if (receipt.id) {
+            receiptMap.set(receipt.id, receipt);
+          }
+        });
+        const allReceipts = Array.from(receiptMap.values());
+        console.log('Manager Team Page - Total unique receipts:', allReceipts.length);
+
+        // Calculate team member data
+        const memberData: TeamMemberData[] = employees.map(employee => {
+          const memberReceipts = allReceipts.filter(r => 
+            r.uploadedBy === employee.email || r.uploadedBy === employee.id
+          );
+
+          // Calculate total spending using getReceiptTotalAmount
+          const totalSpending = memberReceipts.reduce((sum, receipt) => {
+            return sum + getReceiptTotalAmount(receipt);
+          }, 0);
+
+          // Get last submission date
+          const lastSubmission = memberReceipts.length > 0
+            ? format(new Date(memberReceipts.sort((a, b) => 
+                new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+              )[0].uploadedAt), 'yyyy-MM-dd')
+            : 'N/A';
+
+          // Count pending approvals
+          const pendingApprovals = memberReceipts.filter(r => r.status === 'pending_approval').length;
+
+          return {
+            id: employee.id,
+            name: employee.name || employee.email || 'Unknown',
+            email: employee.email || '',
+            role: employee.role || 'Employee',
+            totalSpending,
+            receipts: memberReceipts.length,
+            status: 'active', // Default to active
+            lastSubmission,
+            pendingApprovals
+          };
+        });
+
+        // Calculate team statistics
+        const totalSpending = allReceipts.reduce((sum, receipt) => {
+          return sum + getReceiptTotalAmount(receipt);
+        }, 0);
+
+        const pendingApprovals = allReceipts.filter(r => r.status === 'pending_approval').length;
+        const fraudAlerts = allReceipts.filter(r => r.isFraudulent).length;
+
+        setTeamMembers(memberData);
+        setTeamStats({
+          totalMembers: employees.length,
+          activeMembers: employees.length, // All employees are considered active
+          totalSpending,
+          averagePerMember: employees.length > 0 ? totalSpending / employees.length : 0,
+          pendingApprovals,
+          fraudAlerts,
+          totalReceipts: allReceipts.length
+        });
+
+      } catch (error) {
+        console.error('Manager Team Page - Error loading team data:', error);
+        // Set empty state on error
+        setTeamMembers([]);
+        setTeamStats({
+          totalMembers: 0,
+          activeMembers: 0,
+          totalSpending: 0,
+          averagePerMember: 0,
+          pendingApprovals: 0,
+          fraudAlerts: 0,
+          totalReceipts: 0
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user?.id, user?.companyId]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -105,6 +182,16 @@ export default function ManagerTeamPage() {
         return <Clock className="h-4 w-4" />;
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-4 sm:p-6">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -133,7 +220,7 @@ export default function ManagerTeamPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${teamStats.totalSpending.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">This month</p>
+            <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
@@ -167,8 +254,13 @@ export default function ManagerTeamPage() {
           <CardDescription>Manage your team members and their expense submissions</CardDescription>
         </CardHeader>
         <CardContent className="p-4 sm:p-6">
-          <div className="space-y-5">
-            {teamMembers.map((member) => (
+          {teamMembers.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No team members found</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {teamMembers.map((member) => (
               <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-5 sm:p-6 border rounded-lg hover:bg-gray-50 transition-colors gap-5 sm:gap-4">
                 <div className="flex items-start space-x-4 flex-1 min-w-0">
                   <Avatar className="h-12 w-12 flex-shrink-0">
@@ -223,8 +315,9 @@ export default function ManagerTeamPage() {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -249,7 +342,7 @@ export default function ManagerTeamPage() {
             <div className="text-center p-4 border rounded-lg">
               <Receipt className="h-8 w-8 text-purple-600 mx-auto mb-2" />
               <h3 className="font-medium mb-1">Total Receipts</h3>
-              <p className="text-sm text-gray-600">54 receipts submitted</p>
+              <p className="text-sm text-gray-600">{teamStats.totalReceipts} receipts submitted</p>
             </div>
           </div>
         </CardContent>

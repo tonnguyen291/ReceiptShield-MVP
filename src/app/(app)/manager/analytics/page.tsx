@@ -4,35 +4,246 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { Users, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Clock, Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { getEmployeesForManager, initializeDefaultUsers } from "@/lib/firebase-user-store";
+import { getReceiptsForManager } from "@/lib/receipt-store";
+import { getReceiptTotalAmount } from "@/lib/data-service";
+import type { ProcessedReceipt } from "@/types";
+
+interface TeamSpendingData {
+  employee: string;
+  amount: number;
+  receipts: number;
+  status: string;
+}
+
+interface CategoryData {
+  category: string;
+  amount: number;
+  percentage: number;
+  count: number;
+}
 
 export default function ManagerAnalyticsPage() {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
   const [teamData, setTeamData] = useState({
-    totalTeamMembers: 12,
-    activeSubmissions: 45,
-    pendingApprovals: 8,
-    totalTeamSpending: 12500,
-    averagePerEmployee: 1041.67,
-    topSpender: "Sarah Johnson",
-    mostCommonCategory: "Meals",
-    fraudAlerts: 2
+    totalTeamMembers: 0,
+    activeSubmissions: 0,
+    pendingApprovals: 0,
+    totalTeamSpending: 0,
+    averagePerEmployee: 0,
+    topSpender: "",
+    mostCommonCategory: "",
+    fraudAlerts: 0
   });
 
-  const [teamSpending, setTeamSpending] = useState([
-    { employee: "Sarah Johnson", amount: 2450, receipts: 15, status: "approved" },
-    { employee: "Mike Chen", amount: 1890, receipts: 12, status: "pending" },
-    { employee: "Emily Davis", amount: 1650, receipts: 10, status: "approved" },
-    { employee: "John Smith", amount: 1420, receipts: 8, status: "approved" },
-    { employee: "Lisa Wang", amount: 1380, receipts: 9, status: "pending" }
-  ]);
+  const [teamSpending, setTeamSpending] = useState<TeamSpendingData[]>([]);
+  const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryData[]>([]);
 
-  const [categoryBreakdown, setCategoryBreakdown] = useState([
-    { category: "Meals", amount: 5200, percentage: 42, count: 25 },
-    { category: "Transportation", amount: 3100, percentage: 25, count: 18 },
-    { category: "Office Supplies", amount: 2200, percentage: 18, count: 12 },
-    { category: "Training", amount: 1200, percentage: 10, count: 6 },
-    { category: "Other", amount: 800, percentage: 6, count: 4 }
-  ]);
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user?.id || user?.role !== 'manager') {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+
+        // Initialize default users if needed (same as Team Dashboard)
+        await initializeDefaultUsers();
+
+        // Get team members - use same approach as Team Dashboard
+        const teamMembers = await getEmployeesForManager(user.id);
+        console.log('Team Analytics - Team members:', teamMembers.length, teamMembers.map(m => ({ id: m.id, email: m.email, name: m.name })));
+        
+        // Get all receipts for the manager's team (by supervisorId)
+        const receiptsBySupervisor = await getReceiptsForManager(user.id);
+        console.log('Team Analytics - Receipts by supervisorId:', receiptsBySupervisor.length);
+        
+        // Also get receipts by employee emails/IDs to catch any that might not have supervisorId set
+        const { getReceiptsByUser } = await import('@/lib/firebase-receipt-store');
+        const employeeReceiptPromises = teamMembers.map(emp => {
+          if (emp.email) {
+            return getReceiptsByUser(emp.email, user?.companyId);
+          }
+          return Promise.resolve([]);
+        });
+        const employeeReceiptsArrays = await Promise.all(employeeReceiptPromises);
+        const receiptsByEmployee = employeeReceiptsArrays.flat();
+        console.log('Team Analytics - Receipts by employee emails:', receiptsByEmployee.length);
+        
+        // Combine and deduplicate receipts
+        const receiptMap = new Map<string, ProcessedReceipt>();
+        [...receiptsBySupervisor, ...receiptsByEmployee].forEach(receipt => {
+          if (receipt.id) {
+            receiptMap.set(receipt.id, receipt);
+          }
+        });
+        const allReceipts = Array.from(receiptMap.values());
+        console.log('Team Analytics - Total unique receipts:', allReceipts.length);
+        
+        if (allReceipts.length > 0) {
+          console.log('Team Analytics - Sample receipts:', allReceipts.slice(0, 3).map(r => ({
+            id: r.id,
+            uploadedBy: r.uploadedBy,
+            itemsCount: r.items?.length || 0
+          })));
+        }
+
+        // Use all receipts (all-time) to match manager dashboard, not just current month
+        // Calculate team spending by employee
+        const employeeSpendingMap: { [email: string]: { amount: number; receipts: number; status: string } } = {};
+        
+        for (const member of teamMembers) {
+          const memberReceipts = allReceipts.filter(r => 
+            r.uploadedBy === member.email || r.uploadedBy === member.id
+          );
+          
+          if (memberReceipts.length > 0) {
+            console.log(`Team Analytics - ${member.name || member.email}: ${memberReceipts.length} receipts`);
+          }
+          
+          // Calculate all-time total for this employee
+          const totalAmount = memberReceipts.reduce((sum, receipt) => {
+            return sum + getReceiptTotalAmount(receipt);
+          }, 0);
+
+          // Determine status (if has pending, show pending, else show approved)
+          const hasPending = memberReceipts.some(r => r.status === 'pending_approval');
+          const hasRejected = memberReceipts.some(r => r.status === 'rejected');
+          
+          let status = "approved";
+          if (hasPending) status = "pending";
+          else if (hasRejected) status = "rejected";
+
+          employeeSpendingMap[member.email || member.id] = {
+            amount: totalAmount,
+            receipts: memberReceipts.length,
+            status
+          };
+        }
+
+        const teamSpendingData: TeamSpendingData[] = teamMembers.map(member => ({
+          employee: member.name || member.email || 'Unknown',
+          amount: employeeSpendingMap[member.email || member.id]?.amount || 0,
+          receipts: employeeSpendingMap[member.email || member.id]?.receipts || 0,
+          status: employeeSpendingMap[member.email || member.id]?.status || 'approved'
+        })).sort((a, b) => b.amount - a.amount);
+
+        // Calculate category breakdown using same logic as getUserSpendingAnalytics
+        const categoryMap: { [category: string]: { amount: number; count: number } } = {};
+        
+        const categorizeByMerchant = (merchant: string): string => {
+          const merchantLower = merchant.toLowerCase();
+          
+          // Food & Dining
+          if (merchantLower.includes('restaurant') || merchantLower.includes('cafe') || 
+              merchantLower.includes('coffee') || merchantLower.includes('food') ||
+              merchantLower.includes('starbucks') || merchantLower.includes('mcdonald') ||
+              merchantLower.includes('pizza') || merchantLower.includes('burger')) {
+            return 'Food & Dining';
+          }
+          
+          // Travel
+          if (merchantLower.includes('hotel') || merchantLower.includes('airline') ||
+              merchantLower.includes('taxi') || merchantLower.includes('uber') ||
+              merchantLower.includes('lyft') || merchantLower.includes('flight') ||
+              merchantLower.includes('travel') || merchantLower.includes('booking')) {
+            return 'Travel';
+          }
+          
+          // Office Supplies
+          if (merchantLower.includes('office') || merchantLower.includes('supplies') ||
+              merchantLower.includes('staples') || merchantLower.includes('depot') ||
+              merchantLower.includes('amazon') || merchantLower.includes('dell') ||
+              merchantLower.includes('computer') || merchantLower.includes('laptop')) {
+            return 'Office Supplies';
+          }
+          
+          // Transportation
+          if (merchantLower.includes('gas') || merchantLower.includes('fuel') ||
+              merchantLower.includes('shell') || merchantLower.includes('exxon') ||
+              merchantLower.includes('chevron') || merchantLower.includes('bp')) {
+            return 'Transportation';
+          }
+          
+          // Entertainment
+          if (merchantLower.includes('movie') || merchantLower.includes('cinema') ||
+              merchantLower.includes('theater') || merchantLower.includes('entertainment') ||
+              merchantLower.includes('netflix') || merchantLower.includes('spotify')) {
+            return 'Entertainment';
+          }
+          
+          return 'Other';
+        };
+        
+        // Use all receipts for category breakdown (all-time)
+        allReceipts.forEach(receipt => {
+          // Category logic - derive from receipt items or use default
+          let category = 'Other';
+          // Try to categorize based on item labels
+          if (receipt.items && receipt.items.length > 0) {
+            const firstItem = receipt.items[0];
+            if (firstItem.label) {
+              category = categorizeByMerchant(firstItem.label);
+            }
+          }
+          
+          const amount = getReceiptTotalAmount(receipt);
+          
+          if (!categoryMap[category]) {
+            categoryMap[category] = { amount: 0, count: 0 };
+          }
+          categoryMap[category].amount += amount;
+          categoryMap[category].count += 1;
+        });
+
+        const totalCategoryAmount = Object.values(categoryMap).reduce((sum, cat) => sum + cat.amount, 0);
+        const categoryData: CategoryData[] = Object.entries(categoryMap)
+          .map(([category, data]) => ({
+            category,
+            amount: data.amount,
+            percentage: totalCategoryAmount > 0 ? (data.amount / totalCategoryAmount) * 100 : 0,
+            count: data.count
+          }))
+          .sort((a, b) => b.amount - a.amount);
+
+        // Calculate summary statistics (all-time, not just current month)
+        const totalTeamSpending = allReceipts.reduce((sum, receipt) => {
+          return sum + getReceiptTotalAmount(receipt);
+        }, 0);
+
+        const pendingApprovals = allReceipts.filter(r => r.status === 'pending_approval').length;
+        const fraudAlerts = allReceipts.filter(r => r.isFraudulent).length;
+        const topSpender = teamSpendingData.length > 0 ? teamSpendingData[0].employee : "";
+        const mostCommonCategory = categoryData.length > 0 ? categoryData[0].category : "";
+
+        setTeamData({
+          totalTeamMembers: teamMembers.length,
+          activeSubmissions: allReceipts.length,
+          pendingApprovals,
+          totalTeamSpending,
+          averagePerEmployee: teamMembers.length > 0 ? totalTeamSpending / teamMembers.length : 0,
+          topSpender,
+          mostCommonCategory,
+          fraudAlerts
+        });
+
+        setTeamSpending(teamSpendingData);
+        setCategoryBreakdown(categoryData);
+
+      } catch (error) {
+        console.error('Error loading team analytics:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user?.id, user?.role]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -59,6 +270,16 @@ export default function ManagerAnalyticsPage() {
         return <Clock className="h-4 w-4" />;
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -87,7 +308,7 @@ export default function ManagerAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${teamData.totalTeamSpending.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">This month</p>
+            <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
@@ -122,6 +343,11 @@ export default function ManagerAnalyticsPage() {
             <CardDescription>Individual spending breakdown for your team</CardDescription>
           </CardHeader>
           <CardContent>
+            {teamSpending.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No team spending data available</p>
+              </div>
+            ) : (
             <div className="space-y-4">
               {teamSpending.map((member, index) => (
                 <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
@@ -148,6 +374,7 @@ export default function ManagerAnalyticsPage() {
                 </div>
               ))}
             </div>
+            )}
           </CardContent>
         </Card>
 
@@ -157,6 +384,11 @@ export default function ManagerAnalyticsPage() {
             <CardDescription>Team expenses broken down by category</CardDescription>
           </CardHeader>
           <CardContent>
+            {categoryBreakdown.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No category data available</p>
+              </div>
+            ) : (
             <div className="space-y-4">
               {categoryBreakdown.map((category, index) => (
                 <div key={index} className="space-y-2">
@@ -177,6 +409,7 @@ export default function ManagerAnalyticsPage() {
                 </div>
               ))}
             </div>
+            )}
           </CardContent>
         </Card>
       </div>
