@@ -1,0 +1,238 @@
+{
+  "dataset": {
+    "input_path": "data/eld_risk_training_mock.csv",
+    "row_count": 10000,
+    "train_rows": 8000,
+    "test_rows": 2000,
+    "feature_columns": [
+      "local_time_zone",
+      "local_hour",
+      "day_of_week",
+      "is_weekend",
+      "latitude",
+      "longitude",
+      "metro_area",
+      "state_code",
+      "road_class",
+      "road_surface",
+      "speed_limit_mph",
+      "weather_condition",
+      "temperature_f",
+      "precipitation_in",
+      "visibility_miles",
+      "wind_speed_mph",
+      "traffic_level",
+      "duty_status",
+      "speed_mph",
+      "speed_over_limit_mph",
+      "time_since_last_break_min",
+      "continuous_drive_min",
+      "hos_drive_remaining_min",
+      "hos_shift_remaining_min",
+      "hos_cycle_remaining_min",
+      "prior_hard_brake_events_24h",
+      "prior_harsh_accel_events_24h",
+      "prior_hos_violation_count_30d",
+      "driver_tenure_days",
+      "scored_trip_count",
+      "cold_start_driver",
+      "engine_on",
+      "engine_hours",
+      "odometer_miles",
+      "idle_time_min",
+      "fuel_level_pct",
+      "tire_pressure_alert_count",
+      "brake_health_score",
+      "maintenance_overdue_days",
+      "check_engine_active",
+      "abs_fault_active"
+    ]
+  },
+  "classification": {
+    "accuracy": 0.5355,
+    "precision": 0.2727,
+    "recall": 0.6278,
+    "f1": 0.3803,
+    "log_loss": 0.6776,
+    "roc_auc": 0.588,
+    "decision_threshold": 0.475,
+    "train_best_f1": 0.3781
+  },
+  "regression": {
+    "rmse": 5.0852,
+    "mae": 3.9858,
+    "r2": 0.904
+  },
+  "classifier_top_weights": {
+    "strongest_positive": [
+      {
+        "feature": "traffic_level_stop_and_go",
+        "weight": 0.22131834531536984
+      },
+      {
+        "feature": "continuous_drive_min",
+        "weight": 0.19665005938541041
+      },
+      {
+        "feature": "speed_over_limit_mph",
+        "weight": 0.17536546021383195
+      },
+      {
+        "feature": "time_since_last_break_min",
+        "weight": 0.12928195406023893
+      },
+      {
+        "feature": "prior_hos_violation_count_30d",
+        "weight": 0.10952770224264284
+      },
+      {
+        "feature": "hos_shift_remaining_min",
+        "weight": 0.0912392372761539
+      },
+      {
+        "feature": "road_surface_damp",
+        "weight": 0.08292955644890926
+      },
+      {
+        "feature": "weather_condition_fog",
+        "weight": 0.08292955644890926
+      },
+      {
+        "feature": "metro_area_Flagstaff",
+        "weight": 0.08278108373453587
+      },
+      {
+        "feature": "road_surface_snow_packed",
+        "weight": 0.08211933141312883
+      }
+    ],
+    "strongest_negative": [
+      {
+        "feature": "traffic_level_light",
+        "weight": -0.1566251544029618
+      },
+      {
+        "feature": "speed_limit_mph",
+        "weight": -0.11113331580537032
+      },
+      {
+        "feature": "local_hour",
+        "weight": -0.09505816027814795
+      },
+      {
+        "feature": "metro_area_Phoenix",
+        "weight": -0.09482881289655057
+      },
+      {
+        "feature": "visibility_miles",
+        "weight": -0.08009946533649737
+      },
+      {
+        "feature": "traffic_level_moderate",
+        "weight": -0.07122885881017986
+      },
+      {
+        "feature": "weather_condition_clear",
+        "weight": -0.0702618938139146
+      },
+      {
+        "feature": "prior_harsh_accel_events_24h",
+        "weight": -0.06321922157884007
+      },
+      {
+        "feature": "road_surface_dry",
+        "weight": -0.06168421312162568
+      },
+      {
+        "feature": "road_surface_dusty",
+        "weight": -0.05555212352441318
+      }
+    ]
+  },
+  "regressor_top_weights": {
+    "strongest_positive": [
+      {
+        "feature": "continuous_drive_min",
+        "weight": 7.579108197202902
+      },
+      {
+        "feature": "traffic_level_stop_and_go",
+        "weight": 5.1544278273343656
+      },
+      {
+        "feature": "speed_over_limit_mph",
+        "weight": 4.1866612679449755
+      },
+      {
+        "feature": "weather_condition_snow",
+        "weight": 3.4390645423622863
+      },
+      {
+        "feature": "road_surface_snow_packed",
+        "weight": 3.4390645423622597
+      },
+      {
+        "feature": "road_class_mountain_pass",
+        "weight": 3.0248435349842064
+      },
+      {
+        "feature": "prior_hos_violation_count_30d",
+        "weight": 2.8254510983226737
+      },
+      {
+        "feature": "duty_status_driving",
+        "weight": 2.7668172402495324
+      },
+      {
+        "feature": "maintenance_overdue_days",
+        "weight": 2.28813067731642
+      },
+      {
+        "feature": "tire_pressure_alert_count",
+        "weight": 2.2075848908958515
+      }
+    ],
+    "strongest_negative": [
+      {
+        "feature": "traffic_level_light",
+        "weight": -5.462652581008601
+      },
+      {
+        "feature": "road_surface_dry",
+        "weight": -5.10833261834516
+      },
+      {
+        "feature": "weather_condition_clear",
+        "weight": -3.8536688011170646
+      },
+      {
+        "feature": "road_class_interstate",
+        "weight": -3.2802222820971716
+      },
+      {
+        "feature": "duty_status_on_duty_not_driving",
+        "weight": -2.766817240246503
+      },
+      {
+        "feature": "visibility_miles",
+        "weight": -2.2348449908665193
+      },
+      {
+        "feature": "brake_health_score",
+        "weight": -1.919821091302621
+      },
+      {
+        "feature": "traffic_level_moderate",
+        "weight": -1.8240416145418086
+      },
+      {
+        "feature": "weather_condition_windy",
+        "weight": -1.089969013161109
+      },
+      {
+        "feature": "local_hour",
+        "weight": -1.0231538058037382
+      }
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+feature_name,feature_group,source_layer,available_in_standard_eld,data_type,description,example_value
+row_id,identity,synthetic_dataset,n/a,string,Stable row key for each driver snapshot in the mock dataset.,snap_0001
+event_timestamp_utc,time,standard_eld,yes,datetime,UTC timestamp for the event or driver snapshot.,2026-02-11T15:20:00.000Z
+local_time_zone,time,location_enrichment,no,string,IANA time zone used to derive local hour and day-of-week.,America/Phoenix
+local_hour,time,derived_from_eld,derived,number,Local hour derived from timestamp plus time zone.,17
+day_of_week,time,derived_from_eld,derived,string,Local weekday derived from timestamp plus time zone.,Wed
+is_weekend,time,derived_from_eld,derived,boolean,Weekend flag derived from local day-of-week.,false
+driver_id,identity,standard_eld,yes,string,Driver identifier from the ELD or carrier identity system.,drv_004
+vehicle_id,identity,standard_eld,yes,string,Vehicle or power unit identifier.,veh_103
+trip_id,identity,dispatch_context,no,string,Synthetic trip grouping key for analysis across snapshots.,trip_2026_014
+scenario_id,context,synthetic_dataset,n/a,string,Scenario template used to generate a plausible freight snapshot.,flagstaff_mountain_corridor
+latitude,location,standard_eld,yes,number,Latitude captured or normalized from the location event.,35.1754
+longitude,location,standard_eld,yes,number,Longitude captured or normalized from the location event.,-111.6541
+metro_area,location,location_enrichment,no,string,Named metro or corridor bucket derived from coordinates.,Phoenix
+state_code,location,location_enrichment,no,string,State or region code derived from coordinates.,AZ
+road_class,location,location_enrichment,no,string,"Road category such as interstate, urban arterial, or mountain pass.",interstate
+road_surface,location,location_enrichment,no,string,Road surface condition inferred from weather and corridor.,wet
+speed_limit_mph,location,location_enrichment,no,number,Posted speed limit attached from map matching or road network data.,65
+weather_condition,environment,external_weather_api,no,string,Weather bucket joined from historical or live weather data.,rain
+temperature_f,environment,external_weather_api,no,number,Ambient temperature at the event location and time.,72.4
+precipitation_in,environment,external_weather_api,no,number,Precipitation intensity joined from the weather feed.,0.12
+visibility_miles,environment,external_weather_api,no,number,Visibility estimate at the event location and time.,3.4
+wind_speed_mph,environment,external_weather_api,no,number,Wind speed joined from the weather feed.,19.6
+traffic_level,environment,traffic_api,no,string,Traffic congestion bucket derived from a traffic provider or state feed.,heavy
+duty_status,driver_state,standard_eld,yes,string,Current HOS duty status such as driving or on-duty not driving.,driving
+speed_mph,driver_state,telematics_or_ecm,no,number,"Vehicle speed from telematics, ECM, or another motion feed.",67
+speed_over_limit_mph,driver_state,derived_from_joined_data,derived,number,Current speed minus joined speed limit.,9
+time_since_last_break_min,driver_state,derived_from_eld,derived,number,Minutes since the last logged break or off-duty period.,191
+continuous_drive_min,driver_state,derived_from_eld,derived,number,Continuous driving minutes since the last non-driving status.,143
+hos_drive_remaining_min,driver_state,derived_from_eld,derived,number,Minutes remaining before the driver hits the driving limit.,177
+hos_shift_remaining_min,driver_state,derived_from_eld,derived,number,Minutes remaining before the driver hits the on-duty shift limit.,283
+hos_cycle_remaining_min,driver_state,derived_from_eld,derived,number,Minutes remaining in the rolling duty cycle window.,1950
+prior_hard_brake_events_24h,driver_state,telematics_or_ecm,no,number,Count of hard brake detections in the trailing 24 hours.,2
+prior_harsh_accel_events_24h,driver_state,telematics_or_ecm,no,number,Count of harsh acceleration events in the trailing 24 hours.,1
+prior_hos_violation_count_30d,driver_state,derived_from_eld,derived,number,Count of recent HOS violations used as historical context.,1
+driver_tenure_days,driver_state,carrier_master_data,no,number,Days since the driver joined the carrier or program.,58
+scored_trip_count,driver_state,derived_from_internal_history,no,number,Number of previously scored trips available for calibration.,18
+cold_start_driver,driver_state,derived_from_internal_history,no,boolean,True when the driver has fewer than 30 scored trips.,true
+engine_on,vehicle_state,standard_eld,yes,boolean,Engine power status from the ELD.,true
+engine_hours,vehicle_state,standard_eld,yes,number,Accumulated engine hours from the ELD or ECM.,12418.7
+odometer_miles,vehicle_state,standard_eld,yes,number,Accumulated vehicle miles.,522944
+idle_time_min,vehicle_state,derived_from_eld,derived,number,Estimated idle minutes in the trailing window.,27
+fuel_level_pct,vehicle_state,telematics_or_ecm,no,number,Fuel level from telematics or engine data.,36
+tire_pressure_alert_count,vehicle_state,tpms_or_maintenance,no,number,Count of active tire pressure alerts.,1
+brake_health_score,vehicle_state,maintenance_system,no,number,Maintenance score for brakes on a 0 to 100 scale.,81
+maintenance_overdue_days,vehicle_state,maintenance_system,no,number,Days overdue for a maintenance interval or inspection.,14
+check_engine_active,vehicle_state,telematics_or_fault_codes,no,boolean,True when a check-engine condition is active.,false
+abs_fault_active,vehicle_state,telematics_or_fault_codes,no,boolean,True when an ABS fault is active.,false
+risk_score,label,synthetic_rules_engine,n/a,number,Synthetic risk score from 0 to 100 produced for mock experimentation.,68
+risk_band,label,synthetic_rules_engine,n/a,string,Bucketed version of the risk score.,high
+risk_event_next_2h,label,synthetic_rules_engine,n/a,boolean,Synthetic target flag indicating an elevated event likelihood within two hours.,true
+intervention_recommendation,label,synthetic_rules_engine,n/a,string,Plain-English intervention suggestion tied to the top risk factor.,prompt_break
+primary_risk_reason,label,synthetic_rules_engine,n/a,string,Dominant explainability reason for the risk score.,fatigue_low_hos
+secondary_risk_reason,label,synthetic_rules_engine,n/a,string,Second-most-important explainability reason for the risk score.,wet_or_low_visibility

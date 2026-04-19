@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Public Sans', 'Segoe UI', sans-serif;
+    background: #f4f6fa;
+    color: #2f3850;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button {
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  svg {
+    display: block;
+    width: 1em;
+    height: 1em;
+  }
+
+  /* Colored pin markers: no default Leaflet white tile. */
+  .leaflet-div-icon.rc-driver-pin-marker {
+    background: transparent !important;
+    border: none !important;
+  }
+}

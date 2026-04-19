@@ -1,0 +1,36 @@
+@startuml RightCall_Demo_Containers
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+skinparam defaultFontSize 10
+
+title RightCall — containers
+
+Person(operator, "Operator", "Browser")
+
+System_Boundary(sys, "RightCall") {
+  Container(spa, "Web SPA", "React 19 · TS · Vite · Tailwind · Leaflet", "Dispatcher UI: map, live queue, risk, reports.")
+  Container(convex, "Convex backend", "TS functions + schema", "API, realtime subscriptions, audit tables.")
+  Container(ml, "ML training & batch", "Python · NumPy · Pandas", "scripts/train_risk_model.py — offline training, metrics, artifacts/ml/.")
+  Container(node, "Data & geo tooling", "Node ESM", "generate-eld-risk-dataset.mjs, fetchRoutes.mjs (OSRM).")
+  Container(inf, "Model serving", "Python / C++ runtime", "LightGBM inference, SHAP, Isolation Forest, Prophet; OR-Tools worker for optimization jobs.")
+  Container(llm, "NL & summarization", "HTTPS API", "GPT-4.1 / GPT-5 / Claude — SHAP-conditioned summaries & assistant tools.")
+}
+
+System_Ext(host, "Convex cloud", "Hosted deployment")
+System_Ext(osrm, "OSRM", "Public routing API")
+System_Ext(eld, "ELD", "Telemetry stream")
+
+Rel(operator, spa, "HTTPS")
+Rel(spa, host, "WSS · HTTPS")
+Rel(convex, host, "deploy")
+Rel(spa, convex, "client SDK")
+Rel(ml, convex, "HTTPS · batch", "promote model")
+Rel(inf, convex, "HTTPS · internal", "online scores")
+Rel(inf, eld, "stream", "features")
+Rel(llm, inf, "HTTPS", "SHAP + scores")
+Rel(node, osrm, "HTTPS", "routes")
+Rel(node, ml, "files", "CSV")
+
+SHOW_LEGEND()
+@enduml

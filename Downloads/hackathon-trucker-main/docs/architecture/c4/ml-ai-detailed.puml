@@ -1,0 +1,42 @@
+@startuml RightCall_ML_AI_Detailed
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 10
+skinparam wrapWidth 220
+
+title RightCall — intelligence, optimization & NL stack
+
+Person(operator, "Dispatcher / planner", "Fleet operations")
+
+System_Boundary(rc, "RightCall platform") {
+  Container(spa, "Operations SPA", "React · TypeScript · Vite", "Map, live queue, risk console, reports — synced playback & live Convex data.")
+  Container(api, "Application API", "Convex TypeScript", "Authz, fleet state, interventions, audit events, feature flags.")
+  Container(risk, "Risk prediction", "**LightGBM**", "Trip and driver risk scores from ELD + dispatch tabular features; calibrated outputs.")
+  Container(exp, "Explainability", "**SHAP** + **LLM**", "SHAP for feature attribution; LLM summary layer turns SHAP + context into short dispatcher narratives.")
+  Container(opt, "Dispatch optimization", "**OR-Tools**", "CP-SAT / routing: HOS, time windows, capacity, deadhead minimization.")
+  Container(nl, "NL assistant", "**GPT-4.1 · GPT-5 · Claude**", "OpenAI or Anthropic models with tool calls into Convex queries and risk endpoints.")
+  Container(fc, "Forecasting", "**Prophet** → **LightGBM**", "Prophet for seasonality-first baselines; LightGBM for residual and short-horizon lift.")
+  Container(ad, "Anomaly detection", "**Isolation Forest**", "Multivariate outliers on telemetry, HOS, and dwell patterns.")
+}
+
+System_Ext(eld, "ELD / telematics", "Canonical events, HOS, GPS")
+System_Ext(tms, "TMS / orders", "Loads, appointments, constraints")
+
+Rel(operator, spa, "HTTPS")
+Rel(operator, nl, "HTTPS", "chat / voice UI")
+Rel(spa, api, "WSS + HTTPS", "Convex client")
+Rel(api, risk, "internal", "feature vectors · scores")
+Rel(api, fc, "internal", "forecasts")
+Rel(api, ad, "internal", "flags")
+Rel(risk, exp, "internal", "SHAP values")
+Rel(exp, nl, "internal", "summaries")
+Rel(opt, api, "internal", "assignments")
+Rel(risk, eld, "stream / batch", "features")
+Rel(risk, tms, "HTTPS", "load context")
+Rel(fc, eld, "batch", "series")
+Rel(ad, eld, "stream", "vectors")
+
+SHOW_LEGEND()
+@enduml

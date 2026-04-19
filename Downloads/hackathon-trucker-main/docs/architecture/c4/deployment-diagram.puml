@@ -1,0 +1,37 @@
+@startuml RightCall_Demo_Deployment
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+LAYOUT_WITH_LEGEND()
+skinparam defaultFontSize 10
+
+title RightCall — deployment topology
+
+Deployment_Node(edge, "Edge", "Internet") {
+  Deployment_Node(browser, "Browser") {
+    Container(cdn, "Static SPA", "Vite dist on CDN", "React bundle, hashed assets, TLS.")
+  }
+}
+
+Deployment_Node(control, "Control plane", "SaaS") {
+  Container(conv, "Convex", "Prod deployment", "Functions, DB, auth hooks, realtime.")
+}
+
+Deployment_Node(compute, "Compute", "VPC / k8s") {
+  Container(svc, "Inference & optimization", "Containers", "LightGBM · SHAP · Isolation Forest · Prophet; OR-Tools batch workers.")
+  Container(llm, "LLM gateway", "API proxy", "GPT-4.1 · GPT-5 · Claude — rate limits, PII redaction, tool routing.")
+}
+
+Deployment_Node(dev, "Local dev", "Engineer laptop") {
+  Container(vite, "Vite", ":5173", "HMR")
+  Container(cxd, "convex dev", "local", "SQLite backend")
+}
+
+Rel(browser, cdn, "HTTPS")
+Rel(browser, conv, "WSS · HTTPS")
+Rel(browser, llm, "HTTPS", "assistant")
+Rel(svc, conv, "HTTPS", "write scores · read features")
+Rel(llm, svc, "private network", "SHAP + scores")
+Rel(vite, cxd, "dev")
+
+SHOW_LEGEND()
+@enduml

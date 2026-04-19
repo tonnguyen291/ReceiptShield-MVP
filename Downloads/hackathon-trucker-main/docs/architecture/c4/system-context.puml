@@ -1,0 +1,31 @@
+@startuml RightCall_Demo_System_Context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+skinparam defaultFontSize 10
+
+title RightCall — system context
+
+Person(operator, "Dispatcher / fleet operator", "Map, queue, risk, NL assistant.")
+
+System_Boundary(rc, "RightCall") {
+  System(web, "Operations web client", "React, TypeScript, Vite, Tailwind, Leaflet.")
+  System(intel, "Intelligence services", "LightGBM risk, SHAP+LLM explainability, OR-Tools optimization, Prophet·LightGBM forecasting, Isolation Forest anomalies, GPT/Claude NL layer.")
+}
+
+System_Ext(convex, "Convex", "Realtime API, persistence, auth integration surface.")
+System_Ext(eld, "ELD / telematics", "HOS, GPS, engine events.")
+System_Ext(tms, "TMS / loads", "Orders, constraints.")
+System_Ext(maps, "Map tiles", "Basemap CDN.")
+System_Ext(llm, "LLM provider", "OpenAI · Anthropic.")
+
+Rel(operator, web, "HTTPS")
+Rel(web, convex, "WSS · HTTPS")
+Rel(web, maps, "HTTPS")
+Rel(intel, convex, "HTTPS · internal", "scores · tools")
+Rel(intel, eld, "ingest", "features")
+Rel(intel, tms, "HTTPS", "context")
+Rel(intel, llm, "HTTPS", "completion")
+
+SHOW_LEGEND()
+@enduml
